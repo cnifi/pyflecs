@@ -1,12 +1,18 @@
-from ctypes import Structure
+from ctypes import Structure, sizeof
 from inspect import get_annotations, isclass
-from typing import Optional
+from typing import Optional, Self
+
+from .types import Boolean, Double, Int32, Int64, String
+
+MAXINT32 = 2147483647
 
 
 class Component(Structure):
     """Base class for all component classes."""
 
-    __wrappedname__: Optional[str] = None
+    _wrappedclass_: Self
+
+    _wrappedname_: Optional[str] = None
 
 
 ComponentType = type[Component]
@@ -16,32 +22,93 @@ def is_component(c):
     return isclass(c) and issubclass(c, Component)
 
 
-def component(cls: type):
+def component(cls):
     """Decorator for flecs component classes."""
 
-    def _compute_fields(cls):
-        return list(get_annotations(cls).items())
+    def configure_field(k: str, t: type):
+        if t is int:
+            return (
+                f"_{k}",
+                Int64,
+                lambda value: Int64(value),
+                lambda value: int(value),
+            )
+        if t is float:
+            return (
+                f"_{k}",
+                Double,
+                lambda value: Double(value),
+                lambda value: float(value),
+            )
+        if t is bool:
+            return (
+                f"_{k}",
+                Boolean,
+                lambda value: Boolean(value),
+                lambda value: bool(value),
+            )
+        if t is str:
+            return (
+                f"_{k}",
+                String,
+                lambda value: value.encode("utf-8") if value is not None else None,
+                lambda value: value.decode("utf-8") if value is not None else None,
+            )
+        return k, t, None, None
 
-    def _compute_align(cls):
-        # field_size = sizeof(item[1])
-        # if _Component._align_ < field_size:
-        #   _Component._align_ = field_size
-        return 8
+    fields = list(get_annotations(cls).items())
 
-    class _Component(Component):
+    field_configs = [configure_field(k, t) for k, t in fields]
+
+    def compute_align():
+        lowest = 0
+
+        for _, typ, _, _ in field_configs:
+            size = sizeof(typ)
+            if size > lowest:
+                lowest = size
+
+        return lowest
+
+    def map_init_arg(i, v):
+        config = field_configs[i]
+
+        if len(config) < 3:
+            return v
+
+        return config[2](v)  # type: ignore
+
+    def map_init_args(*args):
+        return [map_init_arg(i, v) for i, v in enumerate(args)]
+
+    class WrappedComponent(Component):
         # The wrapped class
-        _wrapped = cls
+        _wrappedclass_ = cls
 
         # Component name is taken from the wrapped class
-        __wrappedname__ = cls.__name__
+        _wrappedname_ = cls.__name__
 
         # The ctypes field definitions
-        _fields_ = _compute_fields(cls)
+        _fields_ = [(tup[0], tup[1]) for tup in field_configs]
 
         # The ctypes struct alignment
-        _align_ = _compute_align(cls)
+        _align_ = compute_align()
 
         # The ctypes struct pack
-        # _pack_ = _compute_pack(cls)
+        # _pack_ = _compute_pack(cls)        # The ctypes struct pack
 
-    return _Component
+        def __init__(self, *args, **kwargs):
+            super().__init__(*map_init_args(*args))
+
+    for key, _, to, fro in field_configs:
+        if to is not None and fro is not None:
+
+            def getter(self):
+                return fro(getattr(self, key))  # type: ignore
+
+            def setter(self, value):
+                return setattr(self, key, to(value))  # type: ignore
+
+            setattr(WrappedComponent, key[1:], property(getter, setter))
+
+    return WrappedComponent

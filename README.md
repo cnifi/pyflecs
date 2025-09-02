@@ -1,46 +1,103 @@
 # pyflecs
 
-Python bindings for the excellent [FLECS](https://www.flecs.dev/flecs/) library.
-
-## Audience
-
-PyFLECS is for anyone who loves FLECS, as well as for anyone who wants to build
-real games with Python and an ECS oriented development approach. PyFLECS marries
-the raw performance of a C based, highly optimized performance centric modern ECS
-implementation, with the rapid prototyping that Python is best known for. Both
-the FLECS library itself, and PyFLECS, come from a culture of indie development
-where small teams are trying to make big things happen. The PyFLECS binding
-attempts to help bring game engine agnostic game development to the next level
-in terms of ease of rapid prototyping and iteration on game ideas.
-
-## Philosophy
-
-PyFLECS aims to #1 maintain close correspondence with the original C FLECS
-implementation, while #2 also abstracting the underlying C concepts in a way in
-which the programmer can work entirely within Python, without handling any
-ctypes-wrapped structures or functions directly. #1 ensures ease of
-portability as FLECS grows and evolves, light-weight abstraction so to not
-impact performance, and ability to adapt easily to changes in the underlying
-FLECS architecture without having to refactor class relationships too much.
-#2 ensures that the code will fit comfortably inside any Python codebase,
-while also emphasizing ease of use and agility that the Python programmer
-looks to as a rapid prototyping language.
+Python bindings for the excellent [flecs](https://www.flecs.dev/flecs/) library.
 
 ## Design
 
-PyFLECS consists of two parts. Part #1 is the ctypes-based CFLECS binding, which
-is automatically generated using [ctypesgen](https://github.com/ctypesgen/ctypesgen).
-If so desired, this binding can be used directly, but part #2 is a Python wrapper around
-the automatically generated bindings, which seeks to significantly improve the
-readability and ease of use of FLECS, so it's recommended to use #2. Generating
-the bindings in an automated fashion, like this, also helps with portability,
-as regenerating the bindings will generate Python type errors that allow the 
-programmer to track down many or most breaking changes in a relatively easy
-fashion.
+pyflecs consists of two parts; 1- `cflecs` and 2- `pyflecs`.
 
-### CFLECS
+### cflecs
 
-In order to regenerate the Python bindings, you can run:
+Part #1 is the auto-generated C binding which uses [ctypesgen](https://github.com/ctypesgen/ctypesgen). If so desired you can use this binding directly. For more information, see the section on [cflecs](#cflecs).
+
+### pyflecs
+
+pyflecs itself attempts to present a more python-like interface to to the user. See the user guide below for an introduction to the pyflecs API.
+
+## User Guide
+
+### Components
+
+Components are described using decorated classes as templates, similar to python's dataclasses.
+
+```python
+from pyflecs.component import component
+from pyflecs.types import Double
+
+@component
+class Position:
+    x: Double
+    y: Double
+```
+
+#### Limitations of python typing
+
+Python's type are much more flexible than C types, but strict data structure sizing is part of how flecs can be efficient and performant. Therefore, it's recommended that you think of the size of your types, and use the type aliases that are provided in the `pyflecs.types` package in place of python native types.
+
+#### Using python native types (NOT YET SUPPORTED)
+
+In python `int` is not a sized type. Using `int` is a little more natural in python, so we consider it's OK to do so. The same applies to other types, such as `float`, or `str`. The user should be aware of the following:
+
+- When using int, pyflecs assumes you mean CInt32
+- When using float, pyflecs assumes you mean CDouble
+- When using str, pyflecs assumes you mean CString (char *)
+
+Here's an example of the same code as above, using python `float` instead.
+
+```python
+from pyflecs.component import component
+from pyflecs.types import Double
+
+@component
+class Position:
+    x: float
+    y: float
+```
+
+### Creating components
+
+To create your component, simply call the world method `component`.
+
+```python
+from pyflecs.component import component
+from pyflecs.types import Double
+from pyflecs.world import World
+
+@component
+class Position:
+    x: Double
+    y: Double
+
+def main():
+    world = World()
+    world.component(Position)
+```
+
+The world `component` method returns an `EntityId` which represents the component inside the flecs world. When calling other methods, or interacting with flecs in a way in which you need to provide the component ID, pyflecs also allows you to use the type (`Position`, for instance) as a reference, and the flecs ID will be looked up automatically.
+
+## Entities
+
+### Creating an entity
+
+```python
+def main():
+    world = World()
+    e = world.entity()
+
+```
+
+Similarly to as in the component case, `world.entity()` returns an EntityId.
+
+## Systems
+
+
+
+
+## cflecs
+
+#### Updating the autogenerated bindings
+
+In order to regenerate cflecs, you can run:
 
 TODO: We should have a `uv` command for this
 
@@ -48,109 +105,17 @@ TODO: We should have a `uv` command for this
 .venv/bin/ctypesgen -llibflecs.dylib ./flecs.h ./flecs.c -o cflecs.py
 ```
 
-Of course, this won't be that useful without first updating to the version of
-FLECS to which you wish to port. The easiest way to do this is to build FLECS
-from source. Following the steps in the FLECS manual in order to build with
-CMake, you should be able to create a distributable in shared object form,
-e.g. `libflecs.dylib`.
+Of course, this won't be that useful without first updating to the version of flecs to which you wish to port. The easiest way to do this is to build flecs from source. Following the steps in the flecs manual in order to build with cmake, you should be able to create a distributable in shared object form, e.g. `libflecs.dylib`.
 
 From there, you can either copy the header and source
-files from FLECS' `distr` directory, or, alternatively, if you're building
-a version of `libflecs.dylib` that includes a customized set of FLECS addons,
-you can copy the appropriate files from FLECS' `src` directory to generate
+files from flecs' `distr` directory, or, alternatively, if you're building
+a version of `libflecs.dylib` that includes a customized set of flecs addons,
+you can copy the appropriate files from flecs' `src` directory to generate
 the minimal set of bindings that you need for whatever your purposes are.
-It should be noted that PyFLECS currently depends upon, and assumes, that
+It should be noted that pyflecs currently depends upon, and assumes, that
 `cflecs.py` will contain the autogenerated bindings for the full version of
-FLECS, including addons.
+flecs, including addons.
 
-The output will be written into `cflecs.py` and references within PyFLECS will
+The output will be written into `cflecs.py` and references within `pyflecs` will
 automatically point to the updated bindings, so you can begin porting right
 away.
-
-## Examples
-
-Before going any further, you may wish to see what PyFLECS looks like in
-action. Following are some examples that showcase code written using PyFLECS
-will look like.
-
-
-### Performing a Query
-
-```python
-    @component
-    class Position:
-        x: Double                                   # x: pyflecs.Double
-        y: Double                                   # y: pyflecs.Double
-
-    world = World()
-
-    cid = world.component(Position)                 # cid: pyflecs.IdType (c_uint64)
-    entity = world.entity()                         # entity: pyflecs.IdType (c_uint64)
-    world.set(entity, Position(5, 5))               # Does lazy component add
-
-    query = world.query_kwargs(terms=[world.term_kwargs(id=Position)])
-
-    for result in query:                            # Iterate entities with Position
-        position = result.component(0, Position)    # position: Position
-        print(position.x)
-        print(position.y)
-```
-
-
-## Concepts
-
-### Builders
-
-PyFLECS uses builders to both ensure the underlying code does not have to deal
-with much data conversion, as well as to abstract away the data conversion that
-does happen to as great an extent as possible.
-
-Builders follow these conventions:
-
-- The builder interface will always accept Python data types, or at very least
-Python data types that can be implicitly converted into their ctypes
-counterparts with no extra code
-- Builders may be utilized in 2 different ways,
-    * chaining
-    * kwargs
-- Data held by a builder will always be mutable, but
-- When a builder's build() method is called, the resulting built object will
-consider its members read-only
-- Built objects always contain ctypes types, and therefore inspecting data
-contained within them will necessarily involve conversion
-- When possible, inspect builder data, and avoid inspecting data inside
-built objects whenever possible to avoid unnecessary conversions
-
-#### Examples
-
-Building a query description.
-```python
-query_desc = world.query_description().terms([
-    ...
-]).build()
-```
-
-Building a query description with kwargs.
-```python
-query_desc = world.query_description_kwargs(
-    terms=...
-)
-```
-
-Building a system description.
-```python
-system = world.system_description()
-    .query_desc(query_desc)
-    .callback(lambda x: None) # Do nothing
-    .immediate(True)
-    .build()
-```
-
-Building a system description with kwargs.
-```python
-system = world.system_description_kwargs(
-    query_desc=query_desc,
-    callback=lambda x: None,
-    immediate=True
-)
-```

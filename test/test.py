@@ -1,8 +1,10 @@
+from ctypes import c_wchar
+
 from pyflecs.component import component
 from pyflecs.inspect import stringify_ecs_iter_t
 from pyflecs.query import QueryDescription
 from pyflecs.system import system
-from pyflecs.types import Double
+from pyflecs.types import Double, String
 from pyflecs.world import World
 
 # from pyflecs.pipeline import Phase
@@ -10,16 +12,16 @@ from pyflecs.world import World
 
 @component
 class Position:
-    x: Double
-    y: Double
+    x: int
+    y: int
+    z: str
 
 
 @system(query=QueryDescription.tuple([(Position,)]))
 class EachSystem:
-    def each(self, iter):
-        p = iter.component(0, Position)
-        print(p.x)
-        print(p.y)
+    def each(self, result):
+        p = result.component(0, Position)
+        print(p.z)
 
 
 def main():
@@ -27,12 +29,12 @@ def main():
 
     world.component(Position)
 
+    p = Position(5, 6, "FER")
+
     entity = world.entity()
 
-    print(entity)
-
-    world.add(entity, Position)
-    world.set(entity, Position(5, 5))
+    # world.add(entity, Position)
+    world.set(entity, p)
 
     each_system = world.system(EachSystem)
 

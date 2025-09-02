@@ -92,7 +92,7 @@ class World:
         entity_desc = BoxedEntityDesc()
         entity_desc.id = 0
 
-        name = cls.__wrappedname__
+        name = cls._wrappedname_
 
         if name is None:
             raise WorldException("Could not determine name for component %s", cls)
