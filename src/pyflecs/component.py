@@ -4,8 +4,6 @@ from typing import Optional, Self
 
 from .types import Boolean, Double, Int32, Int64, String
 
-MAXINT32 = 2147483647
-
 
 class Component(Structure):
     """Base class for all component classes."""
@@ -61,14 +59,14 @@ def component(cls):
     field_configs = [configure_field(k, t) for k, t in fields]
 
     def compute_align():
-        lowest = 0
+        highest = 0
 
         for _, typ, _, _ in field_configs:
             size = sizeof(typ)
-            if size > lowest:
-                lowest = size
+            if size > highest:
+                highest = size
 
-        return lowest
+        return highest
 
     def map_init_arg(i, v):
         config = field_configs[i]

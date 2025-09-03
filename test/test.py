@@ -20,8 +20,7 @@ class Position:
 @system(query=QueryDescription.tuple([(Position,)]))
 class EachSystem:
     def each(self, result):
-        p = result.component(0, Position)
-        print(p.z)
+        pass
 
 
 def main():
@@ -33,7 +32,7 @@ def main():
 
     entity = world.entity()
 
-    # world.add(entity, Position)
+    world.add(entity, Position)
     world.set(entity, p)
 
     each_system = world.system(EachSystem)
