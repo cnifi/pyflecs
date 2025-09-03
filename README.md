@@ -1,4 +1,4 @@
-# pyflecs
+# pyflecs (PRE-ALPHA)
 
 Python bindings for the excellent [flecs](https://www.flecs.dev/flecs/) library.
 
