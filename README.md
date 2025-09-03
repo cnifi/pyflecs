@@ -47,7 +47,7 @@ class Position:
 
 Python's type are much more flexible than C types, but strict data structure sizing is part of how flecs can be efficient and performant. Therefore, it's recommended that you think of the size of your types, and use the type aliases that are provided in the `pyflecs.types` package in place of python native types.
 
-#### Using python native types (NOT YET SUPPORTED)
+#### Using python native types
 
 In python `int` is not a sized type. Using `int` is a little more natural in python, so we consider it's OK to do so. The same applies to other types, such as `float`, or `str`. The user should be aware of the following:
 
