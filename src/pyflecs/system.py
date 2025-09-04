@@ -1,6 +1,5 @@
 from ctypes import c_void_p
-from functools import wraps
-from typing import Callable, Optional, final
+from typing import Callable
 
 from .adaptor import BoxedSystemDescription
 from .cflecs import (
@@ -190,7 +189,7 @@ class SystemDescription:
     def __init__(
         self,
         system_desc: BoxedSystemDescription,
-        query: Optional[QueryDescription] = None,
+        query: QueryDescription | None = None,
     ):
         self._value = system_desc
         self._query = query
@@ -295,11 +294,11 @@ SystemType = type[System]
 def system(
     entity: EntityId | None = None,
     query: QueryDescription | None = None,
-    ctx: c_void_p | None = None,  # TODO
+    ctx: c_void_p | None = None,
     ctx_free: ContextFreeAction | None = None,
-    callback_ctx: c_void_p | None = None,  # TODO
+    callback_ctx: c_void_p | None = None,
     callback_ctx_free: ContextFreeAction | None = None,
-    run_ctx: c_void_p | None = None,  # TODO
+    run_ctx: c_void_p | None = None,
     run_ctx_free: ContextFreeAction | None = None,
     interval: Time | None = None,
     rate: Int32 | None = None,

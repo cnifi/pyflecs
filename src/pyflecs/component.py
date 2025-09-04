@@ -26,28 +26,28 @@ def component(cls):
     def configure_field(k: str, t: type):
         if t is int:
             return (
-                f"_{k}",
+                "_" + k,
                 Int64,
                 lambda value: Int64(value),
                 lambda value: int(value),
             )
         if t is float:
             return (
-                f"_{k}",
+                "_" + k,
                 Double,
                 lambda value: Double(value),
                 lambda value: float(value),
             )
         if t is bool:
             return (
-                f"_{k}",
+                "_" + k,
                 Boolean,
                 lambda value: Boolean(value),
                 lambda value: bool(value),
             )
         if t is str:
             return (
-                f"_{k}",
+                "_" + k,
                 String,
                 lambda value: value.encode("utf-8") if value is not None else None,
                 lambda value: value.decode("utf-8") if value is not None else None,
