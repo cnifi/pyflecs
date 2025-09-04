@@ -1,4 +1,4 @@
-from __future__ import annotations  # Required for runtime typing
+from __future__ import annotations
 
 from ctypes import (
     CFUNCTYPE,
@@ -15,11 +15,10 @@ from ctypes import (
     cast as ccast,
 )
 from enum import Enum
-from typing import Callable, Optional
+from typing import Callable
 
-# from .world import World
 from .adaptor import BoxedQueryDesc, BoxedTerm, BoxedTermRef
-from .cflecs import (  # EcsQueryCacheNone, ecs_field_w_size, ecs_id_t, ecs_query_init,
+from .cflecs import (
     FLECS_TERM_COUNT_MAX,
     EcsAcyclic,
     EcsAlias,
@@ -105,21 +104,14 @@ from .inspect import (
 )
 from .types import ContextFreeAction, EntityId, Int8, Int32
 
-UINT64_MAX_INT = 18446744073709551615
-
 
 class TermRefBuilder:
     """Builds a pyflecs.TermRef"""
 
-    def __init__(self, value: Optional[int | str | ComponentType] = None):
+    def __init__(self, value: int | str | ComponentType | None = None):
         self._value = value
         self._refs = dict[str, int]()
 
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
     def value(self, value):
         self._value = value
         if value is ComponentType:
@@ -177,69 +169,50 @@ class TermBuilder:
 
     def __init__(
         self,
-        id: Optional[int | ComponentType] = None,
-        src: Optional[str | ComponentType] = None,
-        first: Optional[str | ComponentType] = None,
-        second: Optional[str | ComponentType] = None,
+        id: int | ComponentType | None = None,
+        src: int | str | ComponentType | None = None,
+        first: int | str | ComponentType | None = None,
+        second: int | str | ComponentType | None = None,
     ):
         self._refs = dict[str, int]()
+        self.id(id)
         self._src = TermRefBuilder()
+        self.src(src)
         self._first = TermRefBuilder()
+        self.first(first)
         self._second = TermRefBuilder()
-        self.id = id if id is not callable(id) else None  # :-<
-        self.src = src
-        self.first = first
-        self.second = second
+        self.second(second)
 
-    @property
-    def id(self):
-        return self._id
-
-    @id.setter
-    def id(self, id_: Optional[int | ComponentType] = None):
-        self._id = id_
-        if is_component(id_):
-            self._refs["id"] = id(id_)
+    def id(self, idd: int | ComponentType | None):
+        self._id = idd
+        if is_component(idd):
+            self._refs["id"] = id(idd)
         return self
 
-    @property
-    def src(self):
-        return self._src
-
-    @src.setter
-    def src(self, src: Optional[int | str | ComponentType]):
-        self.src.value = src
+    def src(self, src: int | str | ComponentType | None):
+        self._src.value(src)
         return self
 
-    @property
-    def first(self):
-        return self._first
-
-    @first.setter
-    def first(self, first: Optional[int | str | ComponentType]):
-        self.first.value = first
+    def first(self, first: int | str | ComponentType | None):
+        self._first.value(first)
         return self
 
-    @property
-    def second(self):
-        return self._second
-
-    @second.setter
-    def second(self, second: Optional[str | ComponentType]):
-        self.second.value = second
+    def second(self, second: int | str | ComponentType | None):
+        self._second.value(second)
         return self
 
     def build(self):
         t = BoxedTerm()
         if self._id and type(self._id) is int:
             t.id = self._id
-        if self._src:
+        if self._src._value is not None:
             t.src = self._src.build()._value
-        if self._first:
+        if self._first._value is not None:
             t.first = self._first.build()._value
-        if self._second:
+        if self._second._value is not None:
             t.second = self._second.build()._value
-        return Term(t, self._refs)
+        r = Term(t, self._refs)
+        return r
 
 
 class Term:
@@ -456,17 +429,17 @@ class QueryDescriptionBuilder:
     def __init__(
         self,
         terms: list[Term] = [],
-        cache_kind: Optional[CacheKind] = None,
-        flags: Optional[QueryFlags] = None,
-        entity: Optional[int] = None,
-        order_by: Optional[int] = None,
-        group_by: Optional[int] = None,
-        order_by_callback: Optional[OrderBy] = None,
-        group_by_callback: Optional[GroupBy] = None,
-        on_group_create: Optional[OnGroupCreate] = None,
-        on_group_delete: Optional[OnGroupDelete] = None,
-        group_by_ctx: Optional[c_void_p] = None,
-        group_by_ctx_free: Optional[ContextFreeAction] = None,
+        cache_kind: CacheKind | None = None,
+        flags: QueryFlags | None = None,
+        entity: int | None = None,
+        order_by: int | None = None,
+        group_by: int | None = None,
+        order_by_callback: OrderBy | None = None,
+        group_by_callback: GroupBy | None = None,
+        on_group_create: OnGroupCreate | None = None,
+        on_group_delete: OnGroupDelete | None = None,
+        group_by_ctx: c_void_p | None = None,
+        group_by_ctx_free: ContextFreeAction | None = None,
         ctx=None,  # TODO
         ctx_free=None,  # TODO
     ):
@@ -485,119 +458,52 @@ class QueryDescriptionBuilder:
         self._ctx = ctx
         self._ctx_free = ctx_free
 
-    @property
-    def terms(self):
-        return self._terms
-
-    @terms.setter
     def terms(self, terms: list[Term]):
         self._terms = terms
 
-    @property
-    def cache_kind(self):
-        return self._cache_kind
-
-    @cache_kind.setter
     def cache_kind(self, cache_kind: CacheKind):
         self._cache_kind = cache_kind
         return self
 
-    @property
-    def entity(self):
-        return self._entity
-
-    @entity.setter
     def entity(self, entity: EntityId):
         self._entity = entity
         return self
 
-    @property
-    def order_by(self):
-        return self._order_by
-
-    @order_by.setter
     def order_by(self, order_by: EntityId):
         self._order_by = order_by
         return self
 
-    @property
-    def group_by(self):
-        return self._group_by
-
-    @group_by.setter
     def group_by(self, group_by: EntityId):
         self._group_by = group_by
         return self
 
-    @property
-    def order_by_callback(self):
-        return self._order_by_callback
-
-    @order_by_callback.setter
     def order_by_callback(self, order_by_callback: OrderBy):
         self._order_by_callback = order_by_callback
         return self
 
-    @property
-    def group_by_callback(self):
-        return self._group_by_callback
-
-    @group_by_callback.setter
     def group_by_callback(self, group_by_callback: GroupBy):
         self._group_by_callback = group_by_callback
         return self
 
-    @property
-    def on_group_create(self):
-        return self._on_group_create
-
-    @on_group_create.setter
     def on_group_create(self, on_group_create: OnGroupCreate):
         self._on_group_create = on_group_create
         return self
 
-    @property
-    def on_group_delete(self):
-        return self._on_group_delete
-
-    @on_group_delete.setter
     def on_group_delete(self, on_group_delete: OnGroupDelete):
         self._on_group_delete = on_group_delete
         return self
 
-    @property
-    def group_by_ctx(self):
-        return self._group_by_ctx
-
-    @group_by_ctx.setter
     def group_by_ctx(self, group_by_ctx: c_void_p):
         self._group_by_ctx = group_by_ctx
 
-    @property
-    def group_by_ctx_free(self):
-        return self._group_by_ctx_free
-
-    # TODO
-    @group_by_ctx_free.setter
     def group_by_ctx_free(self, group_by_ctx_free):
         self._group_by_ctx_free = group_by_ctx_free
         return self
 
-    @property
-    def ctx(self):
-        return self._ctx
-
-    @ctx.setter
     def ctx(self, ctx: c_void_p):
         self._ctx = ctx
         return self
 
-    @property
-    def ctx_free(self):
-        return self._ctx_free
-
-    # TODO
-    @ctx_free.setter
     def ctx_free(self, _ctx_free):
         self._ctx_free = _ctx_free
         return self
@@ -699,7 +605,12 @@ class QueryDescription:
         return CacheKind(self._value.cache_kind)
 
     def __repr__(self):
-        return f"QueryDescription: terms=\n{stringify_ecs_query_desc_t(self._value)}"
+        return "\n".join(
+            [
+                "QueryDescription:",
+                f"{stringify_ecs_query_desc_t(self._value)}",
+            ]
+        )
 
 
 class QueryExecutor:

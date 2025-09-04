@@ -2,7 +2,7 @@ from ctypes import Structure, sizeof
 from inspect import get_annotations, isclass
 from typing import Optional, Self
 
-from .types import Boolean, Double, Int32, Int64, String
+from .types import Boolean, Double, Int64, String
 
 
 class Component(Structure):
@@ -98,15 +98,17 @@ def component(cls):
         def __init__(self, *args, **kwargs):
             super().__init__(*map_init_args(*args))
 
-    for key, _, to, fro in field_configs:
-        if to is not None and fro is not None:
+    for key, _, to, frm in field_configs:
+        if to is not None and frm is not None:
 
-            def getter(self):
-                return fro(getattr(self, key))  # type: ignore
+            def getter(self, key=key, to=to, frm=frm):
+                return frm(getattr(self, key))
 
-            def setter(self, value):
-                return setattr(self, key, to(value))  # type: ignore
+            def setter(self, value, key=key, to=to, frm=frm):
+                setattr(self, key, to(value))
 
-            setattr(WrappedComponent, key[1:], property(getter, setter))
+            prop = property(getter, setter)
+
+            setattr(WrappedComponent, key[1:], prop)
 
     return WrappedComponent

@@ -51,7 +51,7 @@ Python's type are much more flexible than C types, but strict data structure siz
 
 In python `int` is not a sized type. Using `int` is a little more natural in python, so we consider it's OK to do so. The same applies to other types, such as `float`, or `str`. The user should be aware of the following:
 
-- When using int, pyflecs assumes you mean CInt32
+- When using int, pyflecs assumes you mean CInt64
 - When using float, pyflecs assumes you mean CDouble
 - When using str, pyflecs assumes you mean CString (char *)
 
@@ -144,14 +144,14 @@ Refer to the flecs manual for an in depth look. In flecs, basically Terms are a 
 
     qd = (
         QueryDescription.builder()
-        .terms([Term.tuple((Position,))]) # Index 0 of the array is always `id`
+        .terms([Term.tuple((Position,))]) # Index 0 of the tuple is always `id`
         .build()
     )
 ```
 
 ### The query description tuple shorthand
 
-If you don't need any additional config, you can construct a simple query with the QueryDescription.tuple shorthand, which expects an array of tuple `[(id,src,first,second),...]`:
+If you don't need any additional config, you can construct a simple query with the `QueryDescription.tuple` shorthand, which expects an array of tuple `[(id, src, first, second), ...]`:
 
 ```python
     @component
@@ -275,6 +275,11 @@ Systems must be run inside world.
     world.run(system_instance)
     world.run(system_instance.id) # either works
 ```
+
+## Running pyflecs
+
+Ctypes style python ports such as pyflecs rely on there being a dylib (shared library) built object version of the flecs C implementation. To do this, simply follow the steps to build flecs with CMake and copy the resulting dylib to the pyflecs source directory,
+in the same directory as cflecs.py.
 
 ## cflecs
 

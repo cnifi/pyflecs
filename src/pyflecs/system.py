@@ -47,17 +47,17 @@ class SystemDescriptionBuilder:
         query: QueryDescription | None = None,
         callback: IterateAction | None = None,
         run: RunAction | None = None,
-        ctx: Optional[c_void_p] = None,  # TODO
-        ctx_free: Optional[ContextFreeAction] = None,
-        callback_ctx: Optional[c_void_p] = None,  # TODO
-        callback_ctx_free: Optional[ContextFreeAction] = None,
-        run_ctx: Optional[c_void_p] = None,  # TODO
-        run_ctx_free: Optional[ContextFreeAction] = None,
-        interval: Optional[Time] = None,
-        rate: Optional[Int32] = None,
-        tick_source: Optional[EntityId] = None,
-        multi_threaded: Optional[bool] = None,
-        immediate: Optional[bool] = None,
+        ctx: c_void_p | None = None,  # TODO
+        ctx_free: ContextFreeAction | None = None,
+        callback_ctx: c_void_p | None = None,  # TODO
+        callback_ctx_free: ContextFreeAction | None = None,
+        run_ctx: c_void_p | None = None,  # TODO
+        run_ctx_free: ContextFreeAction | None = None,
+        interval: Time | None = None,
+        rate: Int32 | None = None,
+        tick_source: EntityId | None = None,
+        multi_threaded: bool | None = None,
+        immediate: bool | None = None,
     ):
         self._entity = entity
         self._query = query
@@ -295,19 +295,18 @@ SystemType = type[System]
 def system(
     entity: EntityId | None = None,
     query: QueryDescription | None = None,
-    # ctx: Optional[c_void_p] = None,  # TODO
-    # ctx_free: Optional[ContextFreeAction] = None,
-    # callback_ctx: Optional[c_void_p] = None,  # TODO
-    # callback_ctx_free: Optional[ContextFreeAction] = None,
-    # run_ctx: Optional[c_void_p] = None,  # TODO
-    # run_ctx_free: Optional[ContextFreeAction] = None,
-    interval: Optional[Time] = None,
-    rate: Optional[Int32] = None,
-    tick_source: Optional[EntityId] = None,
-    multi_threaded: Optional[bool] = None,
-    immediate: Optional[bool] = True,
+    ctx: c_void_p | None = None,  # TODO
+    ctx_free: ContextFreeAction | None = None,
+    callback_ctx: c_void_p | None = None,  # TODO
+    callback_ctx_free: ContextFreeAction | None = None,
+    run_ctx: c_void_p | None = None,  # TODO
+    run_ctx_free: ContextFreeAction | None = None,
+    interval: Time | None = None,
+    rate: Int32 | None = None,
+    tick_source: EntityId | None = None,
+    multi_threaded: bool | None = None,
+    immediate: bool | None = True,
 ):
-    @wraps(System)
     def decorator(cls: type):
         class _WrappedSystem(cls, System):
             def __init__(self, world):
@@ -315,6 +314,12 @@ def system(
                     SystemDescriptionBuilder()
                     .entity(entity)
                     .query(query)
+                    .ctx(ctx)
+                    .ctx_free(ctx_free)
+                    .callback_ctx(callback_ctx)
+                    .callback_ctx_free(callback_ctx_free)
+                    .run_ctx(run_ctx)
+                    .run_ctx_free(run_ctx_free)
                     .interval(interval)
                     .rate(rate)
                     .tick_source(tick_source)

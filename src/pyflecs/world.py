@@ -1,7 +1,5 @@
 from ctypes import _Pointer, byref, c_uint64, sizeof
-from functools import singledispatch
-from types import MethodType
-from typing import Dict, Self, Sequence
+from typing import Dict
 
 from .adaptor import BoxedComponentDesc, BoxedEntityDesc
 from .cflecs import (
@@ -20,7 +18,7 @@ from .cflecs import (
 )
 from .component import Component, ComponentType
 from .query import Query, QueryDescription
-from .system import RunAction, System, SystemDescription, SystemType
+from .system import System, SystemDescription, SystemType
 from .types import EntityId
 
 
