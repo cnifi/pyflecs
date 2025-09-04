@@ -162,6 +162,7 @@ class World:
         # Initialize the system and get the system id
 
         s._id = ecs_system_init(wv, byref(sd._value))
+        s._world = w
 
         # Register the flecs id to the python reference
 
