@@ -16,7 +16,7 @@ from .cflecs import (
     ecs_system_init,
     struct_ecs_world_t,
 )
-from .component import Component, ComponentType
+from .component import Component
 from .query import Query, QueryDescription
 from .system import System, SystemDescription, SystemType
 from .types import EntityId
@@ -26,7 +26,7 @@ class WorldException(Exception):
     pass
 
 
-PyflecsObject = ComponentType | System
+PyflecsObject = type[Component] | System
 
 
 class World:
@@ -78,11 +78,7 @@ class World:
     def pobof(self, id: int | EntityId):
         return self._pid2pob[id if type(id) is int else self._fid2pid[id]]  # type: ignore
 
-    def pid(self, e: EntityId):
-        """Retrieve the PyThing, provided the ID."""
-        return self._fid2pid[e]
-
-    def component(self, cls: ComponentType) -> EntityId:
+    def component(self, cls: type[Component]) -> EntityId:
         """Register a component in this world."""
 
         desc = BoxedComponentDesc()
@@ -90,12 +86,7 @@ class World:
         entity_desc = BoxedEntityDesc()
         entity_desc.id = 0
 
-        name = cls._wrappedname_
-
-        if name is None:
-            raise WorldException("Could not determine name for component %s", cls)
-
-        byte_name = String(name.encode("utf-8"))
+        byte_name = String(cls._wrapped_.__qualname__.encode("utf-8"))
 
         entity_desc.name = byte_name
         entity_desc.symbol = byte_name
@@ -121,7 +112,7 @@ class World:
         desc.use_low_id = False
         return ecs_entity_init(self._value, byref(desc))
 
-    def add(self, e: EntityId, c: ComponentType):
+    def add(self, e: EntityId, c: type[Component]):
         """Add a component to the specified entity."""
         ecs_add_id(self._value, e, self.fidof(c))
 
@@ -129,12 +120,12 @@ class World:
         """Set the value(s) of the component on the specified entity."""
         ecs_set_id(self._value, e, self.fidof(type(c)), sizeof(c), byref(c))
 
-    def get(self, e: EntityId, ct: ComponentType):
-        return ecs_get_id(self._value, e, self.fidof(ct))
+    def get(self, e: EntityId, c: type[Component]):
+        return ecs_get_id(self._value, e, self.fidof(c))
 
-    def query(self, desc: QueryDescription):
+    def query(self, d: QueryDescription):
         """Create a query from a query description object."""
-        return Query(self, desc)
+        return Query(self, d)
 
     def query_kwargs(self, **kwargs):
         """Create a query from a query description built implicitly using the provided kwargs."""
@@ -157,16 +148,14 @@ class World:
             s: System = sord(w)  # type: ignore
             sd = s.description
 
-        sd._resolve(w)
+        sd.resolve(w)
 
         # Initialize the system and get the system id
-
-        s._id = ecs_system_init(wv, byref(sd._value))
+        sid = ecs_system_init(wv, byref(sd._value))
         s._world = w
 
         # Register the flecs id to the python reference
-
-        self._putob(s.id, s)
+        self._putob(sid, s)
 
         return s
 
@@ -175,7 +164,6 @@ class World:
 
     def system_kwargs(self, **kwargs):
         """Create a system from a system description built implicitly using the provided kwargs."""
-
         return self.system(SystemDescription.kwargs(**kwargs))
 
     def progress(self):
@@ -185,6 +173,4 @@ class World:
         if type(s) is int:
             ecs_run(self._value, s, 0.0, None)
         elif isinstance(s, System):
-            ecs_run(self._value, s.id, 0.0, None)
-        else:
-            raise Exception("Type error")
+            ecs_run(self._value, self.fidof(s), 0.0, None)

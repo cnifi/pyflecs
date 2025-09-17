@@ -7,7 +7,7 @@ from .cflecs import (
     ecs_run_action_t,
     struct_ecs_system_desc_t,
 )
-from .inspect import stringify_ecs_system_desc_t
+from .inspect import SPACER, stringify_ecs_system_desc_t
 
 # from .pipeline import Phase
 from .query import QueryDescription, QueryExecutor, QueryResult
@@ -42,21 +42,21 @@ def _run_action(func: RunAction):
 class SystemDescriptionBuilder:
     def __init__(
         self,
-        entity: EntityId | None = None,
+        entity=EntityId(0),
         query: QueryDescription | None = None,
         callback: IterateAction | None = None,
         run: RunAction | None = None,
-        ctx: c_void_p | None = None,  # TODO
+        ctx: c_void_p | None = None,
         ctx_free: ContextFreeAction | None = None,
-        callback_ctx: c_void_p | None = None,  # TODO
+        callback_ctx: c_void_p | None = None,
         callback_ctx_free: ContextFreeAction | None = None,
-        run_ctx: c_void_p | None = None,  # TODO
+        run_ctx: c_void_p | None = None,
         run_ctx_free: ContextFreeAction | None = None,
         interval: Time | None = None,
-        rate: Int32 | None = None,
-        tick_source: EntityId | None = None,
-        multi_threaded: bool | None = None,
-        immediate: bool | None = None,
+        rate=0,
+        tick_source=0,
+        multi_threaded=False,
+        immediate=False,
     ):
         self._entity = entity
         self._query = query
@@ -74,7 +74,7 @@ class SystemDescriptionBuilder:
         self._multi_threaded = multi_threaded
         self._immediate = immediate
 
-    def entity(self, entity: EntityId | None):
+    def entity(self, entity: EntityId):
         self._entity = entity
         return self
 
@@ -114,64 +114,56 @@ class SystemDescriptionBuilder:
         self._run_ctx_free = run_ctx_free
         return self
 
-    def interval(self, interval: Int32 | None):
+    def interval(self, interval: Time):
         self._interval = interval
         return self
 
-    def rate(self, rate: Int32 | None):
+    def rate(self, rate: int):
         self._rate = rate
         return self
 
-    def tick_source(self, tick_source: EntityId | None):
+    def tick_source(self, tick_source: EntityId):
         self._tick_source = tick_source
         return self
 
-    def multi_threaded(self, multi_threaded: bool | None):
+    def multi_threaded(self, multi_threaded: bool):
         self._multi_threaded = multi_threaded
         return self
 
-    def immediate(self, immediate: bool | None):
+    def immediate(self, immediate: bool):
         self._immediate = immediate
         return self
 
     def build(self):
         d = struct_ecs_system_desc_t()
+
         # This happens automatically
         # system_desc._canary = 0
         if self._run is None and self._callback is None:
             raise Exception("SystemDescription must define one of [run, callback]")
-        if self._entity is not None:
-            d.entity = self._entity
+        d.entity = self._entity
         if self._query is not None:
             d.query = self._query._value
-        if self._multi_threaded is not None:
-            d.multi_threaded = self._multi_threaded
+        d.multi_threaded = self._multi_threaded
         if self._callback is not None:
             d.callback = _iterate_action(self._callback)
         if self._run is not None:
             d.run = _run_action(self._run)
-        if self._ctx is not None:
-            d.ctx = self._ctx
+        d.ctx = self._ctx
         if self._ctx_free is not None:
             d.ctx_free = self._ctx_free
-        if self._callback_ctx is not None:
-            d.callback_ctx = self._callback_ctx
+        d.callback_ctx = self._callback_ctx
         if self._callback_ctx_free is not None:
             d.callback_ctx_free = self._callback_ctx_free
-        if self._run_ctx is not None:
-            d.run_ctx = self._run_ctx
+        d.run_ctx = self._run_ctx
         if self._run_ctx_free is not None:
             d.run_ctx_free = self._run_ctx_free
-        if self._interval is not None:
-            d.interval = self._interval
-        if self._rate is not None:
-            d.rate = self._rate
-        if self._tick_source is not None:
-            d.tick_source = self._tick_source
-        if self._multi_threaded is not None:
-            d.multi_threaded = self._multi_threaded
-        if self._immediate is not None:
-            d.immediate = self._immediate
+        #     d.interval = self._interval
+        d.rate = self._rate
+        d.tick_source = self._tick_source
+        d.multi_threaded = self._multi_threaded
+        d.immediate = self._immediate
+
         return SystemDescription(d, self._query)
 
 
@@ -194,14 +186,13 @@ class SystemDescription:
         self._value = system_desc
         self._query = query
 
-    def _resolve(self, world):
+    def resolve(self, world):
         if self._query is not None:
-            self._query._resolve(world)
-            # self._value.query.terms[0].id = self._query._value.terms[0].id
-            self._value.query = self._query._value
+            self._query.resolve(world)
+            self._value.query = QueryDescription.copy(self._query)._value
 
     @property
-    def callback(self):
+    def callback(self) -> IterateAction:
         return self._value.callback
 
     @property
@@ -209,7 +200,7 @@ class SystemDescription:
         return QueryDescription(self._value.query)
 
     @property
-    def run(self):
+    def run(self) -> RunAction:
         return self._value.run
 
     @property
@@ -256,10 +247,29 @@ class SystemDescription:
     def immediate(self) -> bool:
         return self._value.immediate
 
-    def __repr__(self):
+    def repr(self, depth=0):
+        prefix = SPACER * depth
         return "\n".join(
-            ["SystemDescription:", stringify_ecs_system_desc_t(self._value)]
+            [
+                f"{prefix}callback={self._value.callback}",
+                f"{prefix}query=QueryDescription:\n{self._query.repr(depth + 1) if self._query is not None else None}"
+                f"{prefix}run={self._value.run}",
+                f"{prefix}ctx={self._value.ctx}",
+                f"{prefix}ctx_free={self._value.ctx_free}",
+                f"{prefix}callback_ctx={self._value.callback_ctx}",
+                f"{prefix}callback_ctx_free={self._value.callback_ctx_free}",
+                f"{prefix}run_ctx={self._value.run_ctx}",
+                f"{prefix}run_ctx_free={self._value.run_ctx_free}",
+                f"{prefix}interval={self._value.interval}",
+                f"{prefix}rate={self._value.rate}",
+                f"{prefix}tick_source={self._value.tick_source}",
+                f"{prefix}multi_threaded={self._value.multi_threaded}",
+                f"{prefix}immediate={self._value.immediate}",
+            ]
         )
+
+    def __repr__(self):
+        return "\n".join(["SystemDescription:", self.repr(depth=1)])
 
 
 class System:
@@ -270,13 +280,8 @@ class System:
 
         super().__init__()
 
-        self._id = EntityId(0)
         self._world = world
         self.description = description
-
-    @property
-    def id(self):
-        return self._id
 
     def each(self, executor):
         raise NotImplementedError()
@@ -284,15 +289,12 @@ class System:
     def run(self, executor):
         raise NotImplementedError()
 
-    def __int__(self):
-        return self._id
-
 
 SystemType = type[System]
 
 
 def system(
-    entity: EntityId | None = None,
+    entity=EntityId(0),
     query: QueryDescription | None = None,
     ctx: c_void_p | None = None,
     ctx_free: ContextFreeAction | None = None,
@@ -301,13 +303,13 @@ def system(
     run_ctx: c_void_p | None = None,
     run_ctx_free: ContextFreeAction | None = None,
     interval: Time | None = None,
-    rate: Int32 | None = None,
-    tick_source: EntityId | None = None,
-    multi_threaded: bool | None = None,
-    immediate: bool | None = True,
+    rate=0,
+    tick_source=EntityId(0),
+    multi_threaded=False,
+    immediate=True,
 ):
     def decorator(cls: type):
-        class _WrappedSystem(cls, System):
+        class WrappedSystem(cls, System):
             def __init__(self, world):
                 sdb = (
                     SystemDescriptionBuilder()
@@ -337,6 +339,6 @@ def system(
                 System.__init__(self, world, sd)
                 cls.__init__(self)
 
-        return _WrappedSystem
+        return WrappedSystem
 
     return decorator

@@ -77,7 +77,11 @@ EntityId = c_uint64
 
 SizeType = c_size_t
 
-Time = struct_ecs_time_t
+
+class Time:
+    def __init__(self, value: struct_ecs_time_t):
+        self._value = value
+
 
 ContextFreeAction = Callable[[c_void_p], c_void_p]
 

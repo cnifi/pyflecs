@@ -1,3 +1,6 @@
+from ctypes import Structure
+from typing import Callable
+
 from .cflecs import (
     struct_ecs_iter_t,
     struct_ecs_query_desc_t,
@@ -10,6 +13,8 @@ from .cflecs import (
 )
 
 SPACER = " " * 2
+
+type ReprFunc = Callable[[type[Structure], int, dict], None]
 
 
 def stringify_ecs_type_info(value: struct_ecs_type_info_t, depth=1):
@@ -121,12 +126,14 @@ def stringify_ecs_term_t(value: struct_ecs_term_t, depth=1):
     )
 
 
-def stringify_ecs_query_desc_t(value: struct_ecs_query_desc_t, depth=1):
+def stringify_ecs_query_desc_t(
+    value: struct_ecs_query_desc_t, depth=1, reprs={"ecs_term_t": stringify_ecs_term_t}
+):
     prefix = SPACER * depth
 
     terms = "\n".join(
         [
-            f"{prefix}Term:\n{stringify_ecs_term_t(t, depth + 2)}"
+            f"{prefix}Term:\n{reprs['ecs_term_t'](t, depth + 2)}"
             for t in filter(lambda t: t.id > 0, value.terms)
         ]
     )
@@ -134,12 +141,16 @@ def stringify_ecs_query_desc_t(value: struct_ecs_query_desc_t, depth=1):
     return "\n".join([f"{prefix}terms=[\n{terms}{prefix}]"])
 
 
-def stringify_ecs_system_desc_t(value: struct_ecs_system_desc_t, depth=1):
+def stringify_ecs_system_desc_t(
+    value: struct_ecs_system_desc_t,
+    depth=1,
+    reprs: dict[str, Callable] = {"ecs_query_desc_t": stringify_ecs_query_desc_t},
+):
     prefix = SPACER * depth
     return "\n".join(
         [
             f"{prefix}callback={value.callback}",
-            f"{prefix}query=QueryDescription:\n{stringify_ecs_query_desc_t(value.query, depth + 1)}",
+            f"{prefix}query=QueryDescription:\n{reprs['ecs_query_desc_t'](value.query, depth + 1)}",
             f"{prefix}run={value.run}",
             f"{prefix}ctx={value.ctx}",
             f"{prefix}ctx_free={value.ctx_free}",

@@ -11,6 +11,11 @@ class Position:
     z: str
 
 
+@component
+class Bar:
+    x: float
+
+
 @system(query=QueryDescription.tuple([(Position,)]))
 class EachSystem:
     def each(self, result):
@@ -24,10 +29,15 @@ def main():
     world = World()
 
     world.component(Position)
-
-    p = Position(5, 6, "Hello")
+    # world.component(Bar)
 
     entity = world.entity()
+
+    p = Position()
+    p.x = 1
+    p.y = 7
+    p.z = "HEO"
+
     world.set(entity, p)
 
     each_system = world.system(EachSystem)
@@ -37,4 +47,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-#

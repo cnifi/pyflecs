@@ -1,6 +1,6 @@
 from ctypes import Structure, sizeof
-from inspect import get_annotations, isclass
-from typing import Optional, Self
+from inspect import get_annotations
+from typing import Self
 
 from .types import Boolean, Double, Int64, String
 
@@ -8,16 +8,7 @@ from .types import Boolean, Double, Int64, String
 class Component(Structure):
     """Base class for all component classes."""
 
-    _wrappedclass_: Self
-
-    _wrappedname_: Optional[str] = None
-
-
-ComponentType = type[Component]
-
-
-def is_component(c):
-    return isclass(c) and issubclass(c, Component)
+    _wrapped_: Self
 
 
 def component(cls):
@@ -76,15 +67,12 @@ def component(cls):
 
         return config[2](v)  # type: ignore
 
-    def map_init_args(*args):
-        return [map_init_arg(i, v) for i, v in enumerate(args)]
+    # def map_init_args(*args):
+    #     return [map_init_arg(i, v) for i, v in enumerate(args)]
 
     class WrappedComponent(Component):
         # The wrapped class
-        _wrappedclass_ = cls
-
-        # Component name is taken from the wrapped class
-        _wrappedname_ = cls.__name__
+        _wrapped_ = cls
 
         # The ctypes field definitions
         _fields_ = [(tup[0], tup[1]) for tup in field_configs]
@@ -96,7 +84,8 @@ def component(cls):
         # _pack_ = _compute_pack(cls)        # The ctypes struct pack
 
         def __init__(self, *args, **kwargs):
-            super().__init__(*map_init_args(*args))
+            Component.__init__(self)
+            cls.__init__(self, *args, **kwargs)
 
     for key, _, to, frm in field_configs:
         if to is not None and frm is not None:
@@ -107,8 +96,6 @@ def component(cls):
             def setter(self, value, key=key, to=to, frm=frm):
                 setattr(self, key, to(value))
 
-            prop = property(getter, setter)
-
-            setattr(WrappedComponent, key[1:], prop)
+            setattr(WrappedComponent, key[1:], property(getter, setter))
 
     return WrappedComponent
