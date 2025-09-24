@@ -7,11 +7,12 @@ from .cflecs import (
     ecs_run_action_t,
     struct_ecs_system_desc_t,
 )
+from .entity import EntityId
 from .inspect import SPACER, stringify_ecs_system_desc_t
 
 # from .pipeline import Phase
 from .query import QueryDescription, QueryExecutor, QueryResult
-from .types import ContextFreeAction, EntityId, Int32, Time
+from .types import ContextFreeAction, Int32, Time
 
 type IterateAction = Callable[[QueryExecutor], None]
 

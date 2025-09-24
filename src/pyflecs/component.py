@@ -2,6 +2,7 @@ from ctypes import Structure, sizeof
 from inspect import get_annotations
 from typing import Self
 
+from .entity import EntityId
 from .types import Boolean, Double, Int64, String
 
 
@@ -9,6 +10,11 @@ class Component(Structure):
     """Base class for all component classes."""
 
     _wrapped_: Self
+
+
+ComponentId = EntityId | type[Component]
+
+ComponentIdPair = tuple[ComponentId, ComponentId]
 
 
 def component(cls):

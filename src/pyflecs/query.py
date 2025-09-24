@@ -97,6 +97,7 @@ from .cflecs import (
     struct_ecs_world_t,
 )
 from .component import Component
+from .entity import EntityId
 from .inspect import (
     SPACER,
     stringify_ecs_iter_t,
@@ -104,7 +105,7 @@ from .inspect import (
     stringify_ecs_term_ref_t,
     stringify_ecs_term_t,
 )
-from .types import ContextFreeAction, EntityId, Int8, Int32, UInt32
+from .types import ContextFreeAction, Int8, Int32, UInt32
 
 idof = id
 
@@ -247,6 +248,7 @@ class TermBuilder:
 
     def second(self, second: int | str | type[Component] | TermRef | None):
         self._second = second if isinstance(second, TermRef) else TermRef.value(second)
+
         return self
 
     def build(self):
@@ -768,7 +770,7 @@ class QueryExecutor:
 
 
 class QueryResult:
-    """Represents one query result from a pyflecs.Query"""
+    """Represents one query result from a pyflecs.Query."""
 
     def __init__(self, iterator: struct_ecs_iter_t, index: int):
         self._value = iterator

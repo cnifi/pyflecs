@@ -1,3 +1,6 @@
+from ctypes import c_ulong, c_ulonglong
+
+from pyflecs.cflecs import EcsWildcard
 from pyflecs.component import component
 from pyflecs.query import QueryDescription
 from pyflecs.system import system
@@ -9,6 +12,16 @@ class Position:
     x: int
     y: int
     z: str
+
+
+@component
+class Likes:
+    pass
+
+
+@component
+class Poop:
+    pass
 
 
 @component
@@ -29,20 +42,30 @@ def main():
     world = World()
 
     world.component(Position)
+    world.component(Likes)
+    world.component(Poop)
     # world.component(Bar)
 
-    entity = world.entity()
+    e = world.entity()
 
     p = Position()
     p.x = 1
     p.y = 7
     p.z = "HEO"
 
-    world.set(entity, p)
+    world.add(e, Likes)
+
+    world.set(e, p)
 
     each_system = world.system(EachSystem)
 
     world.run(each_system)
+
+    q = world.query_terms([(Poop,)])
+
+    for result in q:
+        print("QUERY")
+        print(result.entity())
 
 
 if __name__ == "__main__":

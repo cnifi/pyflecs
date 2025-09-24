@@ -1,10 +1,10 @@
-from xml.sax.handler import property_encoding
+EntityId = int
 
-from .types import EntityId
+EntityIdPair = tuple[int, int]
 
 
 class Entity:
-    def __init__(self, id: EntityId | None):
+    def __init__(self, id: int | None):
         self._id = id
 
     @property

@@ -73,7 +73,7 @@ String = c_char_p
 
 Boolean = c_bool
 
-EntityId = c_uint64
+IdType = c_uint64
 
 SizeType = c_size_t
 
