@@ -1,36 +1,35 @@
 from ctypes import c_void_p
-from typing import Callable
+from typing import Callable, final
 
 from .adaptor import BoxedSystemDescription
 from .cflecs import (
-    # EcsOnUpdate,
     ecs_run_action_t,
     struct_ecs_system_desc_t,
 )
 from .entity import EntityId
-from .inspect import SPACER, stringify_ecs_system_desc_t
-
-# from .pipeline import Phase
+from .inspect import SPACER
 from .query import QueryDescription, QueryExecutor, QueryResult
-from .types import ContextFreeAction, Int32, Time
+from .types import ContextFreeAction, Time
 
-type IterateAction = Callable[[QueryExecutor], None]
+type EachAction = Callable[[QueryExecutor], None]
+
+idof = id
 
 
-def _iterate_action(func: IterateAction):
+def _each_action(func: EachAction):
     """Decorator for a system action which is executed once per query match."""
 
     @ecs_run_action_t
     def wrapper(iterator):
-        return func(QueryResult(iterator.contents, 0))
+        return func(QueryResult(iterator.contents, 0))  # type: ignore
 
     return wrapper
 
 
-type RunAction = Callable[[QueryExecutor], None]
+type OnceAction = Callable[[QueryExecutor], None]
 
 
-def _run_action(func: RunAction):
+def _once_action(func: OnceAction):
     """Decorator for a system action which is executed once per tick."""
 
     @ecs_run_action_t
@@ -45,8 +44,8 @@ class SystemDescriptionBuilder:
         self,
         entity=EntityId(0),
         query: QueryDescription | None = None,
-        callback: IterateAction | None = None,
-        run: RunAction | None = None,
+        callback: EachAction | None = None,
+        run: OnceAction | None = None,
         ctx: c_void_p | None = None,
         ctx_free: ContextFreeAction | None = None,
         callback_ctx: c_void_p | None = None,
@@ -83,11 +82,11 @@ class SystemDescriptionBuilder:
         self._query = query
         return self
 
-    def callback(self, callback: IterateAction | None):
+    def callback(self, callback: EachAction | None):
         self._callback = callback
         return self
 
-    def run(self, run: RunAction | None):
+    def run(self, run: OnceAction | None):
         self._run = run
         return self
 
@@ -147,9 +146,9 @@ class SystemDescriptionBuilder:
             d.query = self._query._value
         d.multi_threaded = self._multi_threaded
         if self._callback is not None:
-            d.callback = _iterate_action(self._callback)
+            d.callback = _each_action(self._callback)
         if self._run is not None:
-            d.run = _run_action(self._run)
+            d.run = _once_action(self._run)
         d.ctx = self._ctx
         if self._ctx_free is not None:
             d.ctx_free = self._ctx_free
@@ -193,7 +192,7 @@ class SystemDescription:
             self._value.query = QueryDescription.copy(self._query)._value
 
     @property
-    def callback(self) -> IterateAction:
+    def callback(self) -> EachAction:
         return self._value.callback
 
     @property
@@ -201,7 +200,7 @@ class SystemDescription:
         return QueryDescription(self._value.query)
 
     @property
-    def run(self) -> RunAction:
+    def run(self) -> OnceAction:
         return self._value.run
 
     @property
@@ -284,14 +283,22 @@ class System:
         self._world = world
         self.description = description
 
-    def each(self, executor):
+    def each(self, result: QueryResult):
+        """Implementation of iterative action for iterative systems."""
+
         raise NotImplementedError()
 
+    def once(self, executor: QueryExecutor):
+        """Implementation of run action for run systems."""
+
+        raise NotImplementedError()
+
+    @final
     def run(self, executor):
         raise NotImplementedError()
 
-
-SystemType = type[System]
+    def __hash__(self):
+        return idof(self)
 
 
 def system(
@@ -303,7 +310,8 @@ def system(
     callback_ctx_free: ContextFreeAction | None = None,
     run_ctx: c_void_p | None = None,
     run_ctx_free: ContextFreeAction | None = None,
-    interval: Time | None = None,
+    # TODO
+    # interval: Time | None = None,
     rate=0,
     tick_source=EntityId(0),
     multi_threaded=False,
@@ -322,18 +330,19 @@ def system(
                     .callback_ctx_free(callback_ctx_free)
                     .run_ctx(run_ctx)
                     .run_ctx_free(run_ctx_free)
-                    .interval(interval)
+                    # TODO
+                    # .interval(interval)
                     .rate(rate)
                     .tick_source(tick_source)
                     .multi_threaded(multi_threaded)
                     .immediate(immediate)
                 )
 
-                if hasattr(cls, "run"):
-                    sdb.run(lambda *args: cls.run(self, *args))
-
                 if hasattr(cls, "each"):
                     sdb.callback(lambda *args: cls.each(self, *args))
+
+                if hasattr(cls, "run"):
+                    sdb.run(lambda *args: cls.once(self, *args))
 
                 sd = sdb.build()
 

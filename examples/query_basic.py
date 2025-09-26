@@ -1,5 +1,3 @@
-from ctypes import c_ulong, c_ulonglong
-
 from pyflecs.component import component
 from pyflecs.query import QueryDescription
 from pyflecs.system import system
@@ -11,13 +9,6 @@ class Position:
     x: int
     y: int
     z: str
-
-
-@system(query=QueryDescription.tuple([(Position,)]))
-class EachSystem:
-    def each(self, result):
-        c = result.component(0, Position)
-        print("HELLO")
 
 
 @system()
@@ -40,13 +31,12 @@ def main():
 
     world.set(e, p)
 
-    sid, _ = world.system_once(lambda it: print("HELLO"))
+    s = world.system_once(lambda it: print("HELLO"))
+    # s = world.system(RunSystem)
 
-    world.run(sid)
+    world.run(s)
 
-    world.delete(e)
-
-    print("DELETED")
+    # world.delete(e)
 
 
 if __name__ == "__main__":

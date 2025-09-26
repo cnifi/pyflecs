@@ -1,12 +1,15 @@
-from ctypes import _Pointer, byref, c_uint64, sizeof
-from typing import Dict
+from ctypes import _Pointer, byref, sizeof
+
+from bidict import bidict
 
 from .adaptor import BoxedComponentDesc, BoxedEntityDesc
 from .cflecs import (
     String,
     ecs_add_id,
     ecs_add_pair,
+    ecs_clear,
     ecs_component_init,
+    ecs_delete,
     ecs_entity_init,
     ecs_get_id,
     ecs_init,
@@ -17,81 +20,26 @@ from .cflecs import (
     ecs_system_init,
     struct_ecs_world_t,
 )
-from .component import Component, ComponentId, ComponentIdPair
-from .entity import EntityId, EntityIdPair
-from .patch import *
+from .component import Component
+from .patch import patch
 from .query import Query, QueryDescription
-from .system import System, SystemDescription, SystemType
+from .system import EachAction, OnceAction, System, SystemDescription
 from .types import IdType
 
-
-class WorldException(Exception):
-    pass
-
-
-type PyflecsObject = type[Component] | System
-
-EntityOrComponentId = ComponentId
-
-EntityOrComponentIdPair = tuple[EntityOrComponentId, EntityOrComponentId]
+patch()  # TODO: Move to init
 
 
 class World:
-    """Many things happen here"""
-
-    _addr_to_world: Dict[int, object] = dict()
-
-    @classmethod
-    def _world(cls, id: int):
-        return cls._addr_to_world[id]
+    """Many things happen here."""
 
     def __init__(self):
-        # This class acts as a wrapper around struct_ecs_world_t
         self._value: _Pointer[struct_ecs_world_t] = ecs_init()
-
-        # Mapping between ids and their wrapping python instance
-        self._pid2pob = dict[int, PyflecsObject]()
-        self._pid2fid = dict[int, IdType]()
-        self._fid2pid = dict[IdType, int]()
-
-        # TODO: Remove
-        self._addr_to_world[id(self)] = self
-
-    def _putob(self, fid: IdType, pob: PyflecsObject):
-        pid = id(pob)
-        self._pid2pob[pid] = pob
-        self._pid2fid[pid] = fid
-        self._fid2pid[fid] = pid
-
-    def _delob(self, id: int | IdType):
-        if type(id) is int:
-            pid: int = id
-            fid: IdType = self._pid2fid[pid]
-        else:
-            pid: int = id  # type: ignore
-            fid: IdType = self._pid2fid[id]  # type: ignore
-
-        del self._pid2pob[pid]
-        del self._pid2fid[pid]
-        del self._fid2pid[fid]
-
-    def fidof(self, pid: int | PyflecsObject) -> IdType:
-        """Given a python object or python object id, return the associated flecs entity id registered to this world."""
-
-        return self._pid2fid[pid if type(pid) is int else id(pid)]  # type: ignore
-
-    def pidof(self, fid: IdType):
-        """Given the flecs id registered to this world, return the associated python object id."""
-
-        return self._fid2pid[fid]
-
-    def pobof(self, id: int | IdType):
-        """Given the python object id or flecs id registered to this world, return the associated python object."""
-
-        return self._pid2pob[id if type(id) is int else self._fid2pid[id]]  # type: ignore
+        self._systems = bidict[IdType, System]()
+        self._systypes = bidict[IdType, type[System]]()
+        self._cmptypes = bidict[IdType, type[Component]]()
 
     def component(self, cls: type[Component]):
-        """Register a component in this world."""
+        """Create a new component in this world."""
 
         desc = BoxedComponentDesc()
 
@@ -104,7 +52,7 @@ class World:
         entity_desc.symbol = byte_name
         entity_desc.use_low_id = True
 
-        entity_id: c_uint64 = ecs_entity_init(self._value, byref(entity_desc))
+        entity_id: IdType = ecs_entity_init(self._value, byref(entity_desc))
 
         desc.entity = entity_id
         desc.type.size = ecs_size_t(sizeof(cls))
@@ -113,9 +61,9 @@ class World:
 
         # TODO: hooks
 
-        cid = ecs_component_init(self._value, byref(desc))
+        cid: IdType = ecs_component_init(self._value, byref(desc))
 
-        self._putob(cid, cls)
+        self._cmptypes[cid] = cls
 
         return int(cid)
 
@@ -128,11 +76,7 @@ class World:
 
         return int(ecs_entity_init(self._value, byref(d)))
 
-    def add(
-        self,
-        e: EntityId,
-        i: EntityOrComponentId | EntityOrComponentIdPair,
-    ):
+    def add(self, e: int, i: int | tuple[int, int]):
         """Add a component to the specified entity."""
 
         match i:
@@ -143,23 +87,35 @@ class World:
             case int():
                 return ecs_add_id(self._value, e, i)
 
-    def add_pair(self, e: EntityId, p: EntityIdPair | ComponentIdPair):
+    def add_pair(self, e: int, p: tuple[int | type[Component], int | type[Component]]):
         """Add a pair to the specified entity."""
 
-        p0 = IdType(p[0]) if p[0] is int else self.fidof(p[0])
-        p1 = IdType(p[1]) if p[1] is int else self.fidof(p[1])
+        ecs_add_pair(
+            self._value,
+            IdType(e),
+            IdType(p[0]) if p[0] is int else self._cmptypes.inverse[p[0]],  # type: ignore
+            IdType(p[1]) if p[1] is int else self._cmptypes.inverse[p[1]],  # type: ignore
+        )
 
-        ecs_add_pair(self._value, e, p0, p1)
-
-    def set(self, e: EntityId, c: Component):
+    def set(self, e: int, c: Component):
         """Set the value(s) of the component on the specified entity."""
 
-        ecs_set_id(self._value, e, self.fidof(type(c)), sizeof(c), byref(c))
+        ecs_set_id(self._value, e, self._cmptypes.inverse[type(c)], sizeof(c), byref(c))
 
-    def get(self, e: EntityId, c: type[Component]):
+    def get(self, e: int, c: type[Component]):
         """Get a component of the specified entity."""
 
-        return ecs_get_id(self._value, e, self.fidof(c))
+        return ecs_get_id(self._value, e, self._cmptypes.inverse[c])
+
+    def clear(self, eid: int):
+        """Clear the specified entity of all components."""
+
+        ecs_clear(self._value, IdType(eid))
+
+    def delete(self, e: int):
+        """Delete the specified entity."""
+
+        ecs_delete(self._value, e)
 
     def query(self, d: QueryDescription):
         """Create a query from a query description object."""
@@ -174,11 +130,10 @@ class World:
     def query_terms(self, terms: list[tuple]):
         """Create a simple query, with default configuration, based only on a list of terms."""
 
-        print(terms)
         return Query(self, QueryDescription.tuple(terms))
 
-    def system(self, sord: SystemType | SystemDescription):
-        """Create a system instance in this world."""
+    def system(self, sord: SystemDescription | type[System]):
+        """Create a new system."""
 
         w = self
         wv = self._value
@@ -192,31 +147,54 @@ class World:
 
         sd.resolve(w)
 
-        # Initialize the system and get the system id
         sid = ecs_system_init(wv, byref(sd._value))
         s._world = w
 
-        # Register the flecs id to the python reference
-        self._putob(sid, s)
+        self._systypes[sid] = type(s)
+        self._systems[sid] = s
 
-        return s
-
-    # def system_lambda(self, action: Callable[[]]):
-    #     pass
+        return int(sid), s
 
     def system_kwargs(self, **kwargs):
-        """Create a system from a system description built implicitly using the provided kwargs."""
+        """Create a new system from a system description built implicitly using the provided kwargs."""
 
         return self.system(SystemDescription.kwargs(**kwargs))
 
-    # def system_each(self, **kwargs):
-    #     pass
+    def system_once(self, action: OnceAction):
+        """Create a new system, using defaults, with a run action."""
+
+        return self.system(SystemDescription.kwargs(run=action))
+
+    def system_each(self, query: QueryDescription, action: EachAction):
+        """Create a new system, using defaults, with a query and each action."""
+
+        return self.system(SystemDescription.kwargs(query=query, callback=action))
+
+    def run_system_id(self, sid: int, delta=0.0):
+        """Run the specified system once."""
+
+        ecs_run(self._value, IdType(sid), delta, None)
+
+    def run_system_type(self, systype: type[System], delta=0.0):
+        """Run the specified system once."""
+
+        ecs_run(self._value, self._systypes.inverse[systype], delta, None)
+
+    def run_system(self, sys: System, delta=0.0):
+        """Run the specified system once."""
+
+        ecs_run(self._value, self._systems.inverse[sys], delta, None)
+
+    def run(self, sysid_or_systype: int | type[System], delta=0.0):
+        match sysid_or_systype:
+            case int():
+                return self.run_system_id(sysid_or_systype, delta)
+            case type() if issubclass(sysid_or_systype, System):
+                return self.run_system_type(sysid_or_systype, delta)
+            case System():
+                return self.run_system(sysid_or_systype, delta)
 
     def progress(self):
-        return ecs_progress(self._value, 0)
+        """Move time forward on this world, triggering pipeline processing on the delta time."""
 
-    def run(self, s: EntityId | System):
-        if type(s) is int:
-            ecs_run(self._value, s, 0.0, None)
-        elif isinstance(s, System):
-            ecs_run(self._value, self.fidof(s), 0.0, None)
+        return ecs_progress(self._value, 0)
