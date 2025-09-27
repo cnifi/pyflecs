@@ -67,6 +67,25 @@ from .cflecs import (
     EcsQueryCacheAuto,
     EcsQueryCacheDefault,
     EcsQueryCacheNone,
+    EcsQueryCacheYieldEmptyTables,
+    EcsQueryHasCacheable,
+    EcsQueryHasChangeDetection,
+    EcsQueryHasCondSet,
+    EcsQueryHasNonThisOutTerms,
+    EcsQueryHasOutTerms,
+    EcsQueryHasPred,
+    EcsQueryHasRefs,
+    EcsQueryHasScopes,
+    EcsQueryHasTableThisVar,
+    EcsQueryIsCacheable,
+    EcsQueryIsTrivial,
+    EcsQueryMatchNothing,
+    EcsQueryMatchOnlySelf,
+    EcsQueryMatchOnlyThis,
+    EcsQueryMatchThis,
+    EcsQueryMatchWildcards,
+    EcsQueryNested,
+    EcsQueryTrivialCache,
     EcsReflexive,
     EcsRelationship,
     EcsRemove,
@@ -77,6 +96,20 @@ from .cflecs import (
     EcsSymbol,
     EcsSymmetric,
     EcsTarget,
+    EcsTermDontFragment,
+    EcsTermIdInherited,
+    EcsTermIsCacheable,
+    EcsTermIsMember,
+    EcsTermIsOr,
+    EcsTermIsScope,
+    EcsTermIsSparse,
+    EcsTermIsToggle,
+    EcsTermIsTrivial,
+    EcsTermKeepAlive,
+    EcsTermMatchAny,
+    EcsTermMatchAnySrc,
+    EcsTermReflexive,
+    EcsTermTransitive,
     EcsThis,
     EcsTrait,
     EcsTransitive,
@@ -359,68 +392,42 @@ class CacheKind(Enum):
 
 
 class QueryFlags(Enum):
-    FLECS = EcsFlecs
-    FLECS_CORE = EcsFlecsCore
-    WORLD = EcsWorld
-    WILDCARD = EcsWildcard
-    ANY = EcsAny
-    THIS = EcsThis
-    VARIABLE = EcsVariable
-    TRANSITIVE = EcsTransitive
-    REFLEXIVE = EcsReflexive
-    FINAL = EcsFinal
-    INHERITABLE = EcsInheritable
-    ON_INSTANTIATE = EcsOnInstantiate
-    OVERRIDE = EcsOverride
-    INHERIT = EcsInherit
-    DONT_INHERIT = EcsDontInherit
-    SYMMETRIC = EcsSymmetric
-    EXCLUSIVE = EcsExclusive
-    ACYCLIC = EcsAcyclic
-    TRAVERSABLE = EcsTraversable
-    WITH = EcsWith
-    ONE_OF = EcsOneOf
-    CAN_TOGGLE = EcsCanToggle
-    TRAIT = EcsTrait
-    RELATIONSHIP = EcsRelationship
-    TARGET = EcsTarget
-    PAIR_IS_TAG = EcsPairIsTag
-    NAME = EcsName
-    SYMBOL = EcsSymbol
-    ALIAS = EcsAlias
-    CHILD_OF = EcsChildOf
-    IS_A = EcsIsA
-    DEPENDS_ON = EcsDependsOn
-    SLOT_OF = EcsSlotOf
-    ORDERED_CHILDREN = EcsOrderedChildren
-    MODULE = EcsModule
-    PRIVATE = EcsPrivate
-    PREFAB = EcsPrefab
-    DISABLED = EcsDisabled
-    NOT_QUERYABLE = EcsNotQueryable
-    ON_ADD = EcsOnAdd
-    ON_REMOVE = EcsOnRemove
-    ON_SET = EcsOnSet
-    MONITOR = EcsMonitor
-    ON_TABLE_CREATE = EcsOnTableCreate
-    ON_TABLE_DELETE = EcsOnTableDelete
-    ON_DELETE = EcsOnDelete
-    ON_DELETE_TARGET = EcsOnDeleteTarget
-    REMOVE = EcsRemove
-    DELETE = EcsDelete
-    PANIC = EcsPanic
-    SPARSE = EcsSparse
-    DONT_FRAGMENT = EcsDontFragment
-    PRED_EQ = EcsPredEq
-    PRED_MATCH = EcsPredMatch
-    PRED_LOOKUP = EcsPredLookup
-    SCOPE_OPEN = EcsScopeOpen
-    SCOPE_CLOSE = EcsScopeClose
-    EMPTY = EcsEmpty
-    ON_START = EcsOnStart
-    PRE_FRAME = EcsPreFrame
-    # WILDCARD = cflecs.EcsWildcard
-    # QUERY = EcsQuery
+    MATCH_THIS = EcsQueryMatchThis
+    MATCH_ONLY_THIS = EcsQueryMatchOnlyThis
+    MATCH_ONLY_SELF = EcsQueryMatchOnlySelf
+    MATCH_WILDCARDS = EcsQueryMatchWildcards
+    MATCH_NOTHING = EcsQueryMatchNothing
+    HAS_COND_SET = EcsQueryHasCondSet
+    HAS_PRED = EcsQueryHasPred
+    HAS_SCOPES = EcsQueryHasScopes
+    HAS_REFS = EcsQueryHasRefs
+    HAS_OUT_TERMS = EcsQueryHasOutTerms
+    HAS_NON_THIS_OUT_TERMS = EcsQueryHasNonThisOutTerms
+    HAS_CHANGE_DETECTION = EcsQueryHasChangeDetection
+    IS_TRIVIAL = EcsQueryIsTrivial
+    HAS_CACHEABLE = EcsQueryHasCacheable
+    IS_CACHEABLE = EcsQueryIsCacheable
+    HAS_TABLE_THIS_VAR = EcsQueryHasTableThisVar
+    CACHE_YIELD_EMPTY_TABLES = EcsQueryCacheYieldEmptyTables
+    TRIVIAL_CACHE = EcsQueryTrivialCache
+    NESTED = EcsQueryNested
+
+
+class TermFlags:
+    MATCH_ANY = EcsTermMatchAny
+    MATCH_ANY_SRC = EcsTermMatchAnySrc
+    TRANSITIVE = EcsTermTransitive
+    REFLEXIVE = EcsTermReflexive
+    ID_INHERITED = EcsTermIdInherited
+    IS_TRIVIAL = EcsTermIsTrivial
+    IS_CACHEABLE = EcsTermIsCacheable
+    IS_SCOPE = EcsTermIsScope
+    IS_MEMBER = EcsTermIsMember
+    IS_TOGGLE = EcsTermIsToggle
+    KEEP_ALIVE = EcsTermKeepAlive
+    IS_SPARSE = EcsTermIsSparse
+    IS_OR = EcsTermIsOr
+    DONT_FRAGMENT = EcsTermDontFragment
 
 
 # ecs_world_t *world, ecs_table_t *table, ecs_id_t group_id, void *ctx

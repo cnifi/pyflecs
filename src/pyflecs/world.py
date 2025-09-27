@@ -112,10 +112,44 @@ class World:
 
         ecs_clear(self._value, IdType(eid))
 
-    def delete(self, e: int):
-        """Delete the specified entity."""
-
+    def delete_entity(self, e: int):
         ecs_delete(self._value, e)
+
+    def delete_system_id(self, sid: int):
+        self.delete_entity(sid)
+
+        i = IdType(sid)
+
+        del self._systypes[i]
+        del self._systems[i]
+
+    def delete_system_type(self, systype: type[System]):
+        self.delete_system_id(int(self._systypes.inverse[systype]))
+
+    def delete_system(self, sys: System):
+        self.delete_system_id(int(self._systems.inverse[sys]))
+
+    def delete_id(self, e: int):
+        """Delete the entity with the specified id."""
+
+        i = IdType(e)
+        if self._systypes[i] is not None:
+            self.delete_system_type(self._systypes[i])
+        elif self._systems[i] is not None:
+            self.delete_system(self._systems[i])
+        else:
+            self.delete_entity(e)
+
+    def delete(self, e: int | System | type[System]):
+        """Delete the entity with the specified id, object, or type."""
+
+        match e:
+            case int():
+                self.delete_id(e)
+            case System():
+                self.delete_system(e)
+            case type() if issubclass(e, System):
+                self.delete_system_type(e)
 
     def query(self, d: QueryDescription):
         """Create a query from a query description object."""
