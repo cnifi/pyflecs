@@ -15,10 +15,12 @@ from .cflecs import (
     EcsPreStore,
     EcsPreUpdate,
 )
+from .query import QueryDescription
 
 
 class Phase(Enum):
-    OnStart = EcsOnStart
+    ON_START = EcsOnStart
+    PRE_FRAME = EcsPreFrame
     PreFrame = EcsPreFrame
     OnLoad = EcsOnLoad
     PostLoad = EcsPostLoad
@@ -31,3 +33,18 @@ class Phase(Enum):
     PostFrame = EcsPostFrame
     Phase = EcsPhase
     Constant = EcsConstant
+
+
+class PipelineBuilder:
+    def __init__(self, query: QueryDescription | None):
+        self._query = query
+
+    def query(self, query: QueryDescription):
+        self._query = query
+
+    def build(self):
+        pass
+
+
+class Pipeline:
+    pass

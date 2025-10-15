@@ -46,8 +46,6 @@ def main():
 
     world.delete(e)
 
-    print("DELETED")
-
 
 if __name__ == "__main__":
     main()

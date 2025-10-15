@@ -138,7 +138,7 @@ from .inspect import (
     stringify_ecs_term_ref_t,
     stringify_ecs_term_t,
 )
-from .types import ContextFreeAction, IdType, Int8, Int32, UInt32
+from .types import ContextFreeAction, EntityId, Int8, Int32, UInt32
 
 idof = id
 
@@ -431,7 +431,7 @@ class TermFlags:
 
 
 # ecs_world_t *world, ecs_table_t *table, ecs_id_t group_id, void *ctx
-GroupBy = Callable[[object, object, IdType], IdType]
+GroupBy = Callable[[object, object, EntityId], EntityId]
 
 
 def group_by(func: GroupBy):
@@ -460,7 +460,7 @@ def group_by(func: GroupBy):
 
 
 # ecs_entity_t e1, const void *ptr1, ecs_entity_t e2, const void *ptr2
-OrderBy = Callable[[IdType, c_void_p, IdType, c_void_p], int]
+OrderBy = Callable[[EntityId, c_void_p, EntityId, c_void_p], int]
 
 
 def order_by(func: OrderBy):
@@ -475,23 +475,23 @@ def order_by(func: OrderBy):
 
 
 # ecs_world_t *world, uint64_t group_id, void *group_by_ctx
-OnGroupCreate = Callable[[object, IdType, c_void_p], c_void_p]
+OnGroupCreate = Callable[[object, EntityId, c_void_p], c_void_p]
 
 
 def on_group_create(func: OnGroupCreate):
     """Decorator for group create action."""
 
-    _cfunctype = CFUNCTYPE(c_void_p, _Pointer[py_object], IdType, c_void_p)
+    _cfunctype = CFUNCTYPE(c_void_p, _Pointer[py_object], EntityId, c_void_p)
 
     @_cfunctype
-    def wrapper(world, group_id: IdType, group_by_ctx: c_void_p):
+    def wrapper(world, group_id: EntityId, group_by_ctx: c_void_p):
         return func(world, group_id, group_by_ctx)
 
     return func
 
 
 # ecs_world_t *world, uint64_t group_id, void *group_ctx, void *group_by_ctx
-OnGroupDelete = Callable[[object, IdType, c_void_p, c_void_p], c_void_p]
+OnGroupDelete = Callable[[object, EntityId, c_void_p, c_void_p], c_void_p]
 
 # TODO
 # void *ctx
@@ -540,7 +540,7 @@ class QueryDescriptionBuilder:
         self._cache_kind = cache_kind
         return self
 
-    def entity(self, entity: IdType):
+    def entity(self, entity: EntityId):
         self._entity = entity
         return self
 
@@ -548,11 +548,11 @@ class QueryDescriptionBuilder:
         self._flags = flags
         return self
 
-    def order_by(self, order_by: IdType):
+    def order_by(self, order_by: EntityId):
         self._order_by = order_by
         return self
 
-    def group_by(self, group_by: IdType):
+    def group_by(self, group_by: EntityId):
         self._group_by = group_by
         return self
 

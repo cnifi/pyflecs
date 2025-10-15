@@ -1,4 +1,4 @@
-from ctypes import _Pointer, byref, sizeof
+from ctypes import _Pointer, byref, c_uint64, sizeof
 
 from bidict import bidict
 
@@ -24,7 +24,7 @@ from .component import Component
 from .patch import patch
 from .query import Query, QueryDescription
 from .system import EachAction, OnceAction, System, SystemDescription
-from .types import IdType
+from .types import EntityId
 
 patch()  # TODO: Move to init
 
@@ -34,9 +34,9 @@ class World:
 
     def __init__(self):
         self._value: _Pointer[struct_ecs_world_t] = ecs_init()
-        self._systems = bidict[IdType, System]()
-        self._systypes = bidict[IdType, type[System]]()
-        self._cmptypes = bidict[IdType, type[Component]]()
+        self._systems = bidict[EntityId, System]()
+        self._systypes = bidict[EntityId, type[System]]()
+        self._cmptypes = bidict[EntityId, type[Component]]()
 
     def component(self, cls: type[Component]):
         """Create a new component in this world."""
@@ -52,7 +52,7 @@ class World:
         entity_desc.symbol = byte_name
         entity_desc.use_low_id = True
 
-        entity_id: IdType = ecs_entity_init(self._value, byref(entity_desc))
+        entity_id: EntityId = ecs_entity_init(self._value, byref(entity_desc))
 
         desc.entity = entity_id
         desc.type.size = ecs_size_t(sizeof(cls))
@@ -61,7 +61,7 @@ class World:
 
         # TODO: hooks
 
-        cid: IdType = ecs_component_init(self._value, byref(desc))
+        cid: EntityId = ecs_component_init(self._value, byref(desc))
 
         self._cmptypes[cid] = cls
 
@@ -74,7 +74,7 @@ class World:
 
         d.use_low_id = False
 
-        return int(ecs_entity_init(self._value, byref(d)))
+        return ecs_entity_init(self._value, byref(d))
 
     def add(self, e: int, i: int | tuple[int, int]):
         """Add a component to the specified entity."""
@@ -92,9 +92,9 @@ class World:
 
         ecs_add_pair(
             self._value,
-            IdType(e),
-            IdType(p[0]) if p[0] is int else self._cmptypes.inverse[p[0]],  # type: ignore
-            IdType(p[1]) if p[1] is int else self._cmptypes.inverse[p[1]],  # type: ignore
+            EntityId(e),
+            EntityId(p[0]) if p[0] is int else self._cmptypes.inverse[p[0]],  # type: ignore
+            EntityId(p[1]) if p[1] is int else self._cmptypes.inverse[p[1]],  # type: ignore
         )
 
     def set(self, e: int, c: Component):
@@ -107,45 +107,46 @@ class World:
 
         return ecs_get_id(self._value, e, self._cmptypes.inverse[c])
 
-    def clear(self, eid: int):
+    def clear(self, e: EntityId):
         """Clear the specified entity of all components."""
 
-        ecs_clear(self._value, IdType(eid))
+        ecs_clear(self._value, e)
 
-    def delete_entity(self, e: int):
+    def delete_entity(self, e: EntityId):
         ecs_delete(self._value, e)
 
-    def delete_system_id(self, sid: int):
-        self.delete_entity(sid)
+    def delete_system_id(self, s: EntityId):
+        self.delete_entity(s)
 
-        i = IdType(sid)
-
-        del self._systypes[i]
-        del self._systems[i]
+        del self._systypes[s]
+        del self._systems[s]
 
     def delete_system_type(self, systype: type[System]):
-        self.delete_system_id(int(self._systypes.inverse[systype]))
+        """Delete the system given by the system type."""
+
+        self.delete_system_id(self._systypes.inverse[systype])
 
     def delete_system(self, sys: System):
-        self.delete_system_id(int(self._systems.inverse[sys]))
+        """Delete the system given by the system instance."""
 
-    def delete_id(self, e: int):
+        self.delete_system_id(self._systems.inverse[sys])
+
+    def delete_id(self, i: EntityId):
         """Delete the entity with the specified id."""
 
-        i = IdType(e)
         if self._systypes[i] is not None:
             self.delete_system_type(self._systypes[i])
         elif self._systems[i] is not None:
             self.delete_system(self._systems[i])
         else:
-            self.delete_entity(e)
+            self.delete_entity(i)
 
-    def delete(self, e: int | System | type[System]):
+    def delete(self, e: EntityId | System | type[System]):
         """Delete the entity with the specified id, object, or type."""
 
         match e:
-            case int():
-                self.delete_id(e)
+            case EntityId():
+                self.delete_id(c_uint64(e))
             case System():
                 self.delete_system(e)
             case type() if issubclass(e, System):
@@ -207,7 +208,7 @@ class World:
     def run_system_id(self, sid: int, delta=0.0):
         """Run the specified system once."""
 
-        ecs_run(self._value, IdType(sid), delta, None)
+        ecs_run(self._value, EntityId(sid), delta, None)
 
     def run_system_type(self, systype: type[System], delta=0.0):
         """Run the specified system once."""

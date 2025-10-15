@@ -73,9 +73,9 @@ String = c_char_p
 
 Boolean = c_bool
 
-IdType = c_uint64
+EntityId = c_uint64
 
-SizeType = c_size_t
+Size = c_size_t
 
 
 class Time:
