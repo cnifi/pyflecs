@@ -12,7 +12,9 @@ from .cflecs import (
     ecs_delete,
     ecs_entity_init,
     ecs_get_id,
+    ecs_get_pipeline,
     ecs_init,
+    ecs_pipeline_init,
     ecs_progress,
     ecs_run,
     ecs_set_id,
@@ -22,6 +24,7 @@ from .cflecs import (
 )
 from .component import Component
 from .patch import patch
+from .pipeline import Pipeline
 from .query import Query, QueryDescription
 from .system import EachAction, OnceAction, System, SystemDescription
 from .types import EntityId
@@ -32,11 +35,17 @@ patch()  # TODO: Move to init
 class World:
     """Many things happen here."""
 
-    def __init__(self):
+    def __init__(self, pipeline: Pipeline | None = None):
         self._value: _Pointer[struct_ecs_world_t] = ecs_init()
         self._systems = bidict[EntityId, System]()
         self._systypes = bidict[EntityId, type[System]]()
         self._cmptypes = bidict[EntityId, type[Component]]()
+
+    def set_pipeline(self, pipeline: Pipeline):
+        ecs_pipeline_init(self._value, pipeline._value)
+
+    def get_pipeline(self):
+        return Pipeline(ecs_get_pipeline(self._value))
 
     def component(self, cls: type[Component]):
         """Create a new component in this world."""
