@@ -17,7 +17,6 @@ from ctypes import (
 from enum import Enum
 from typing import Callable
 
-from .adaptor import BoxedQueryDesc, BoxedTerm, BoxedTermRef
 from .cflecs import (
     FLECS_TERM_COUNT_MAX,
     EcsQueryCacheAll,
@@ -57,14 +56,6 @@ from .cflecs import (
     EcsTermMatchAnySrc,
     EcsTermReflexive,
     EcsTermTransitive,
-    EcsThis,
-    EcsTrait,
-    EcsTransitive,
-    EcsTraversable,
-    EcsVariable,
-    EcsWildcard,
-    EcsWith,
-    EcsWorld,
     ecs_field_w_size,
     ecs_id_t,
     ecs_query_init,
@@ -72,12 +63,14 @@ from .cflecs import (
     ecs_query_next,
     ecs_term_t,
     struct_ecs_iter_t,
+    struct_ecs_query_desc_t,
     struct_ecs_query_t,
     struct_ecs_table_t,
+    struct_ecs_term_ref_t,
+    struct_ecs_term_t,
     struct_ecs_world_t,
 )
 from .component import Component
-from .entity import EntityId
 from .inspect import (
     SPACER,
     stringify_ecs_iter_t,
@@ -85,11 +78,6 @@ from .inspect import (
 from .types import ContextFreeAction, EntityId, Int8, Int32, UInt32
 
 idof = id
-
-
-class Ref:
-    def resolve(self, world):
-        raise NotImplementedError()
 
 
 class TermRefBuilder:
@@ -116,10 +104,10 @@ class TermRefBuilder:
     def build(self):
         if self._id == 0 and self._name is None:
             raise Exception("One of [id, name] must be set to build TermRef")
-        tr = BoxedTermRef()
-        tr.id = self._id
-        tr.name = self._name
-        return TermRef(tr, self._refs)
+        term_ref = struct_ecs_term_ref_t()
+        term_ref.id = self._id
+        term_ref.name = self._name
+        return TermRef(term_ref, self._refs)
 
 
 class TermRef:
@@ -151,7 +139,7 @@ class TermRef:
     def copy(cls, other: TermRef):
         return TermRefBuilder(id=other.id, name=other.name).build()
 
-    def __init__(self, value: BoxedTermRef, refs=dict[str, type[Component]]()):
+    def __init__(self, value: struct_ecs_term_ref_t, refs=dict[str, type[Component]]()):
         self._value = value
         self._refs = refs
 
@@ -159,10 +147,7 @@ class TermRef:
         """Ensures this object's unbound component refs are given ids."""
 
         if "id" in self._refs:
-            self._value.id = world.fidof(self._refs["id"])
-
-    # def resolved(self):
-    #     return len(self._refs) < 0
+            self._value.id = world.cmptypeid(self._refs["id"])
 
     @property
     def id(self):
@@ -190,7 +175,7 @@ class TermRef:
 
 
 class TermBuilder:
-    """Builds a pyflecs.Term"""
+    """Builds a pyflecs.Term."""
 
     def __init__(
         self,
@@ -225,19 +210,18 @@ class TermBuilder:
 
     def second(self, second: int | str | type[Component] | TermRef | None):
         self._second = second if isinstance(second, TermRef) else TermRef.value(second)
-
         return self
 
     def build(self):
-        t = BoxedTerm()
-        t.id = self._id
+        term = struct_ecs_term_t()
+        term.id = self._id
         if self._src is not None:
-            t.src = self._src._value
+            term.src = self._src._value
         if self._first is not None:
-            t.first = self._first._value
+            term.first = self._first._value
         if self._second is not None:
-            t.second = self._second._value
-        return Term(t, self._refs)
+            term.second = self._second._value
+        return Term(term, self._refs)
 
 
 class Term:
@@ -261,14 +245,13 @@ class Term:
     def tuple(cls, terms: tuple):
         return TermBuilder(*terms).build()
 
-    def __init__(self, term: BoxedTerm, refs=dict[str, type[Component]]()):
+    def __init__(self, term: struct_ecs_term_t, refs=dict[str, type[Component]]()):
         self._value = term
         self._refs = refs
 
     def resolve(self, world):
-        self._value
         if "id" in self._refs:
-            self._value.id = world.fidof(self._refs["id"])
+            self._value.id = world.cmptypeid(self._refs["id"])
         self.src.resolve(world)
         self.first.resolve(world)
         self.second.resolve(world)
@@ -532,55 +515,57 @@ class QueryDescriptionBuilder:
         return self
 
     def build(self):
-        d = BoxedQueryDesc()
+        c_desc = struct_ecs_query_desc_t()
 
         if not self._terms:
             raise Exception("query_desc is required to construct a QueryDescription")
 
         # TODO: It appears we have to allocate the full capacity here...
-        d.terms = (ecs_term_t * FLECS_TERM_COUNT_MAX)(*[t._value for t in self._terms])
+        c_desc.terms = (ecs_term_t * FLECS_TERM_COUNT_MAX)(
+            *[t._value for t in self._terms]
+        )
         # d.terms = (ecs_term_t * len(self._terms))(*[t._value for t in self._terms])
 
         if self._cache_kind is not None:
             # TODO: Will this work
-            d.cache_kind = self._cache_kind.value
+            c_desc.cache_kind = self._cache_kind.value
         if self._entity is not None:
-            d.entity = self._entity
+            c_desc.entity = self._entity
         if self._flags is not None:
-            d.flags = UInt32(self._flags)
+            c_desc.flags = UInt32(self._flags)
         # TODO
         # descriptor.expr = const char* (optional)
         if self._order_by_callback is not None:
-            d.order_by_callback = self._order_by_callback
+            c_desc.order_by_callback = self._order_by_callback
         if self._order_by is not None:
-            d.order_by = self._order_by
+            c_desc.order_by = self._order_by
         if self._group_by is not None:
-            d.group_by = self._group_by
+            c_desc.group_by = self._group_by
         if self._group_by_callback is not None:
-            d.group_by_callback = self._group_by_callback
+            c_desc.group_by_callback = self._group_by_callback
         # TODO
         # descriptor.order_by_table_callback = ecs_sort_table_action_t
         if self._on_group_create is not None:
-            d.on_group_create = self._on_group_create
+            c_desc.on_group_create = self._on_group_create
         if self._on_group_delete is not None:
-            d.on_group_delete = self._on_group_delete
+            c_desc.on_group_delete = self._on_group_delete
         if self._group_by_ctx is not None:
-            d.group_by_ctx = self._group_by_ctx
+            c_desc.group_by_ctx = self._group_by_ctx
         if self._group_by_ctx_free is not None:
-            d.group_by_ctx_free = self._group_by_ctx_free
+            c_desc.group_by_ctx_free = self._group_by_ctx_free
         if self._ctx is not None:
-            d.ctx = self._ctx
+            c_desc.ctx = self._ctx
         if self._ctx_free is not None:
-            d.ctx_free = self._ctx_free
+            c_desc.ctx_free = self._ctx_free
 
-        qd = QueryDescription(d, self._terms)
+        desc = QueryDescription(c_desc, self._terms)
 
         # Return reference for python wrapper object
-        d.binding_ctx = ccast(pointer(py_object(qd)), c_void_p)
+        c_desc.binding_ctx = ccast(pointer(py_object(desc)), c_void_p)
         # TODO
         # query_desc.binding_ctx_free = lambda: query_desc.release()
 
-        return qd
+        return desc
 
 
 class QueryDescription:
@@ -613,15 +598,14 @@ class QueryDescription:
             ctx_free=other.ctx_free,
         ).build()
 
-    def __init__(self, desc: BoxedQueryDesc, terms: list[Term] = []):
+    def __init__(self, desc: struct_ecs_query_desc_t, terms: list[Term] = []):
         self._value = desc
         self._terms = terms
 
     def resolve(self, world):
-        for i, t in enumerate(self._terms):
-            t.resolve(world)
-
-            self._value.terms[i] = Term.copy(t)._value
+        for i, term in enumerate(self._terms):
+            term.resolve(world)
+            self._value.terms[i] = Term.copy(term)._value
 
     @property
     def terms(self):
@@ -755,9 +739,7 @@ class Query:
 
     def __init__(self, world, desc: QueryDescription):
         self._world = world
-
         desc.resolve(world)  # Resolve pyflecs refs
-
         self._value: _Pointer[struct_ecs_query_t] = ecs_query_init(
             world._value, byref(desc._value)
         )

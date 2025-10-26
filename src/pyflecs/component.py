@@ -2,8 +2,7 @@ from ctypes import Structure, sizeof
 from inspect import get_annotations
 from typing import Self
 
-from .entity import EntityId
-from .types import Boolean, Double, Int64, String
+from .types import Boolean, Double, EntityId, Int64, String
 
 
 class Component(Structure):

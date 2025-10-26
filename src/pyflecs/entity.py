@@ -1,6 +1,6 @@
-EntityId = int
+from .types import EntityId
 
-EntityIdPair = tuple[int, int]
+EntityIdPair = tuple[EntityId, EntityId]
 
 
 class Entity:

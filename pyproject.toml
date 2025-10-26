@@ -7,8 +7,22 @@ requires-python = ">=3.13"
 dependencies = [
     "bidict>=0.23.1",
     "ctypesgen>=1.1.1",
+    "plum-dispatch>=2.5.8",
     "ruff>=0.12.4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src"
+]
+testpaths = [
+    "tests"
 ]
 
 [tool.setuptools.package-data]
 pyflecs = ["**/*.dylib"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]

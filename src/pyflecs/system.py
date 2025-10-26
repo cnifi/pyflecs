@@ -1,7 +1,6 @@
 from ctypes import c_void_p
-from typing import Callable, final
+from typing import Callable
 
-from .adaptor import BoxedSystemDescription
 from .cflecs import (
     ecs_run_action_t,
     struct_ecs_system_desc_t,
@@ -42,7 +41,7 @@ def _once_action(func: OnceAction):
 class SystemDescriptionBuilder:
     def __init__(
         self,
-        entity=EntityId(0),
+        entity=0,
         query: QueryDescription | None = None,
         callback: EachAction | None = None,
         run: OnceAction | None = None,
@@ -178,9 +177,17 @@ class SystemDescription:
     def kwargs(cls, **kwargs):
         return SystemDescriptionBuilder(**kwargs).build()
 
+    @classmethod
+    def once(cls, action: OnceAction):
+        return SystemDescriptionBuilder(run=action).build()
+
+    @classmethod
+    def each(cls, query: QueryDescription, action: EachAction):
+        return SystemDescriptionBuilder(query=query, callback=action).build()
+
     def __init__(
         self,
-        system_desc: BoxedSystemDescription,
+        system_desc: struct_ecs_system_desc_t,
         query: QueryDescription | None = None,
     ):
         self._value = system_desc
@@ -270,85 +277,3 @@ class SystemDescription:
 
     def __repr__(self):
         return "\n".join(["SystemDescription:", self.repr(depth=1)])
-
-
-class System:
-    """Base class for all systems."""
-
-    def __init__(self, world, description: SystemDescription):
-        """System.__init__ should not be called by consumers. Call a World.system* factory method"""
-
-        super().__init__()
-
-        self._world = world
-        self.description = description
-
-    def each(self, result: QueryResult):
-        """Implementation of iterative action for iterative systems."""
-
-        raise NotImplementedError()
-
-    def once(self, executor: QueryExecutor):
-        """Implementation of run action for run systems."""
-
-        raise NotImplementedError()
-
-    @final
-    def run(self, executor):
-        raise NotImplementedError()
-
-    def __hash__(self):
-        return idof(self)
-
-
-def system(
-    entity=EntityId(0),
-    query: QueryDescription | None = None,
-    ctx: c_void_p | None = None,
-    ctx_free: ContextFreeAction | None = None,
-    callback_ctx: c_void_p | None = None,
-    callback_ctx_free: ContextFreeAction | None = None,
-    run_ctx: c_void_p | None = None,
-    run_ctx_free: ContextFreeAction | None = None,
-    # TODO
-    # interval: Time | None = None,
-    rate=0,
-    tick_source=EntityId(0),
-    multi_threaded=False,
-    immediate=True,
-):
-    def decorator(cls: type):
-        class WrappedSystem(cls, System):
-            def __init__(self, world):
-                sdb = (
-                    SystemDescriptionBuilder()
-                    .entity(entity)
-                    .query(query)
-                    .ctx(ctx)
-                    .ctx_free(ctx_free)
-                    .callback_ctx(callback_ctx)
-                    .callback_ctx_free(callback_ctx_free)
-                    .run_ctx(run_ctx)
-                    .run_ctx_free(run_ctx_free)
-                    # TODO
-                    # .interval(interval)
-                    .rate(rate)
-                    .tick_source(tick_source)
-                    .multi_threaded(multi_threaded)
-                    .immediate(immediate)
-                )
-
-                if hasattr(cls, "each"):
-                    sdb.callback(lambda *args: cls.each(self, *args))
-
-                if hasattr(cls, "run"):
-                    sdb.run(lambda *args: cls.once(self, *args))
-
-                sd = sdb.build()
-
-                System.__init__(self, world, sd)
-                cls.__init__(self)
-
-        return WrappedSystem
-
-    return decorator

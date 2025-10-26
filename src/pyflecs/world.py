@@ -1,8 +1,7 @@
-from ctypes import _Pointer, byref, c_uint64, sizeof
+from ctypes import POINTER, _Pointer, byref, cast, sizeof
 
 from bidict import bidict
 
-from .adaptor import BoxedComponentDesc, BoxedEntityDesc
 from .cflecs import (
     String,
     ecs_add_id,
@@ -20,39 +19,44 @@ from .cflecs import (
     ecs_set_id,
     ecs_size_t,
     ecs_system_init,
+    struct_ecs_component_desc_t,
+    struct_ecs_entity_desc_t,
     struct_ecs_world_t,
 )
 from .component import Component
+from .entity import EntityIdPair
 from .patch import patch
 from .pipeline import Pipeline
 from .query import Query, QueryDescription
-from .system import EachAction, OnceAction, System, SystemDescription
+from .system import EachAction, OnceAction, SystemDescription
 from .types import EntityId
+
+idof = id
 
 patch()  # TODO: Move to init
 
 
 class World:
-    """Many things happen here."""
-
     def __init__(self, pipeline: Pipeline | None = None):
         self._value: _Pointer[struct_ecs_world_t] = ecs_init()
-        self._systems = bidict[EntityId, System]()
-        self._systypes = bidict[EntityId, type[System]]()
-        self._cmptypes = bidict[EntityId, type[Component]]()
+        self._systemdescs = bidict[EntityId, SystemDescription]()
 
-    def set_pipeline(self, pipeline: Pipeline):
-        ecs_pipeline_init(self._value, pipeline._value)
-
-    def get_pipeline(self):
+    @property
+    def pipeline(self):
+        """Return the pipeline that this world is using."""
         return Pipeline(ecs_get_pipeline(self._value))
+
+    @pipeline.setter
+    def pipeline(self, pipeline: Pipeline):
+        """Set the pipeline that this world is using."""
+        ecs_pipeline_init(self._value, pipeline.description)
 
     def component(self, cls: type[Component]):
         """Create a new component in this world."""
 
-        desc = BoxedComponentDesc()
+        desc = struct_ecs_component_desc_t()
 
-        entity_desc = BoxedEntityDesc()
+        entity_desc = struct_ecs_entity_desc_t()
         entity_desc.id = 0
 
         byte_name = String(cls._wrapped_.__qualname__.encode("utf-8"))
@@ -70,22 +74,19 @@ class World:
 
         # TODO: hooks
 
-        cid: EntityId = ecs_component_init(self._value, byref(desc))
-
-        self._cmptypes[cid] = cls
-
-        return int(cid)
+        return ecs_component_init(self._value, byref(desc))
 
     def entity(self):
         """Create a new entity in this world."""
 
-        d = BoxedEntityDesc()
+        desc = struct_ecs_entity_desc_t()
+        desc.use_low_id = False
 
-        d.use_low_id = False
+        entity_id: EntityId = ecs_entity_init(self._value, byref(desc))
 
-        return ecs_entity_init(self._value, byref(d))
+        return entity_id
 
-    def add(self, e: int, i: int | tuple[int, int]):
+    def add(self, e: EntityId, i: EntityId | EntityIdPair):
         """Add a component to the specified entity."""
 
         match i:
@@ -96,70 +97,51 @@ class World:
             case int():
                 return ecs_add_id(self._value, e, i)
 
-    def add_pair(self, e: int, p: tuple[int | type[Component], int | type[Component]]):
+    def add_pair(
+        self, entity_id: int, pair: tuple[int | type[Component], int | type[Component]]
+    ):
         """Add a pair to the specified entity."""
 
         ecs_add_pair(
             self._value,
-            EntityId(e),
-            EntityId(p[0]) if p[0] is int else self._cmptypes.inverse[p[0]],  # type: ignore
-            EntityId(p[1]) if p[1] is int else self._cmptypes.inverse[p[1]],  # type: ignore
+            entity_id,
+            EntityId(pair[0]) if pair[0] is int else self._cmptypes.inverse[pair[0]],  # type: ignore
+            EntityId(pair[1]) if pair[1] is int else self._cmptypes.inverse[pair[1]],  # type: ignore
         )
 
-    def set(self, e: int, c: Component):
+    def set[T: Component](
+        self, entity_id: EntityId, component_id: EntityId, component: T
+    ):
         """Set the value(s) of the component on the specified entity."""
 
-        ecs_set_id(self._value, e, self._cmptypes.inverse[type(c)], sizeof(c), byref(c))
+        ecs_set_id(self._value, entity_id, component_id, sizeof(T), byref(component))  # type: ignore
 
-    def get(self, e: int, c: type[Component]):
-        """Get a component of the specified entity."""
+    def get[T: Component](
+        self, entity_id: EntityId, component_id: EntityId
+    ) -> T | None:
+        """Get the value of a component by its component id."""
 
-        return ecs_get_id(self._value, e, self._cmptypes.inverse[c])
+        component_void_ptr = ecs_get_id(self._value, entity_id, component_id)
 
-    def clear(self, e: EntityId):
+        if not component_void_ptr:
+            return None
+
+        component_ptr = cast(component_void_ptr, POINTER(T))  # type: ignore
+        component = component_ptr.contents
+
+        return component  # type: ignore
+
+    def clear(self, entity_id: EntityId):
         """Clear the specified entity of all components."""
 
-        ecs_clear(self._value, e)
+        ecs_clear(self._value, entity_id)
 
-    def delete_entity(self, e: EntityId):
-        ecs_delete(self._value, e)
+    def delete(self, entity_id: EntityId):
+        """Delete the specified entity."""
 
-    def delete_system_id(self, s: EntityId):
-        self.delete_entity(s)
+        del self._systemdescs[entity_id]
 
-        del self._systypes[s]
-        del self._systems[s]
-
-    def delete_system_type(self, systype: type[System]):
-        """Delete the system given by the system type."""
-
-        self.delete_system_id(self._systypes.inverse[systype])
-
-    def delete_system(self, sys: System):
-        """Delete the system given by the system instance."""
-
-        self.delete_system_id(self._systems.inverse[sys])
-
-    def delete_id(self, i: EntityId):
-        """Delete the entity with the specified id."""
-
-        if self._systypes[i] is not None:
-            self.delete_system_type(self._systypes[i])
-        elif self._systems[i] is not None:
-            self.delete_system(self._systems[i])
-        else:
-            self.delete_entity(i)
-
-    def delete(self, e: EntityId | System | type[System]):
-        """Delete the entity with the specified id, object, or type."""
-
-        match e:
-            case EntityId():
-                self.delete_id(c_uint64(e))
-            case System():
-                self.delete_system(e)
-            case type() if issubclass(e, System):
-                self.delete_system_type(e)
+        ecs_delete(self._value, entity_id)
 
     def query(self, d: QueryDescription):
         """Create a query from a query description object."""
@@ -176,28 +158,15 @@ class World:
 
         return Query(self, QueryDescription.tuple(terms))
 
-    def system(self, sord: SystemDescription | type[System]):
+    def system(self, system_desc: SystemDescription) -> EntityId:
         """Create a new system."""
 
-        w = self
-        wv = self._value
+        system_id = ecs_system_init(self._value, byref(system_desc._value))
 
-        if isinstance(sord, SystemDescription):
-            sd: SystemDescription = sord
-            s = System(w, sd)
-        else:
-            s: System = sord(w)  # type: ignore
-            sd = s.description
+        # Pyflecs must keep a reference so the object is not garbage collected while flecs is using it
+        self._systemdescs[system_id] = system_desc
 
-        sd.resolve(w)
-
-        sid = ecs_system_init(wv, byref(sd._value))
-        s._world = w
-
-        self._systypes[sid] = type(s)
-        self._systems[sid] = s
-
-        return int(sid), s
+        return system_id
 
     def system_kwargs(self, **kwargs):
         """Create a new system from a system description built implicitly using the provided kwargs."""
@@ -207,36 +176,17 @@ class World:
     def system_once(self, action: OnceAction):
         """Create a new system, using defaults, with a run action."""
 
-        return self.system(SystemDescription.kwargs(run=action))
+        return self.system(SystemDescription.once(action))
 
     def system_each(self, query: QueryDescription, action: EachAction):
         """Create a new system, using defaults, with a query and each action."""
 
-        return self.system(SystemDescription.kwargs(query=query, callback=action))
+        return self.system(SystemDescription.each(query, action))
 
-    def run_system_id(self, sid: int, delta=0.0):
+    def run(self, system_id: EntityId, delta=0.0):
         """Run the specified system once."""
 
-        ecs_run(self._value, EntityId(sid), delta, None)
-
-    def run_system_type(self, systype: type[System], delta=0.0):
-        """Run the specified system once."""
-
-        ecs_run(self._value, self._systypes.inverse[systype], delta, None)
-
-    def run_system(self, sys: System, delta=0.0):
-        """Run the specified system once."""
-
-        ecs_run(self._value, self._systems.inverse[sys], delta, None)
-
-    def run(self, sysid_or_systype: int | type[System], delta=0.0):
-        match sysid_or_systype:
-            case int():
-                return self.run_system_id(sysid_or_systype, delta)
-            case type() if issubclass(sysid_or_systype, System):
-                return self.run_system_type(sysid_or_systype, delta)
-            case System():
-                return self.run_system(sysid_or_systype, delta)
+        ecs_run(self._value, system_id, delta, None)
 
     def progress(self):
         """Move time forward on this world, triggering pipeline processing on the delta time."""

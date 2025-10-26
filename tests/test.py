@@ -1,5 +1,3 @@
-from ctypes import c_ulong, c_ulonglong
-
 from pyflecs.component import component
 from pyflecs.query import QueryDescription
 from pyflecs.system import system
@@ -17,7 +15,8 @@ class Position:
 class EachSystem:
     def each(self, result):
         c = result.component(0, Position)
-        print("HELLO")
+        print(c.x)
+        print(c.y)
 
 
 @system()
